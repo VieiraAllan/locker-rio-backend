@@ -1,0 +1,28 @@
+{
+  "name": "locker-rio-backend",
+  "version": "1.0.0",
+  "description": "Backend do sistema Locker Rio",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/VieiraAllan/locker-rio-backend.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/VieiraAllan/locker-rio-backend/issues"
+  },
+  "homepage": "https://github.com/VieiraAllan/locker-rio-backend#readme",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.105.1",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "pdfkit": "^0.18.0"
+  }
+}
