@@ -73,23 +73,14 @@ locker-rio-backend/
 ├── package-lock.json
 ├── .gitignore
 └── README.md
-<<<<<<< HEAD
-👨‍💻 Autor
-Projeto desenvolvido por Állan R. Vieira
-
-📄 Licença
-Projeto privado em desenvolvimento. Todos os direitos reservados.
-=======
 ```
 
-## 👨‍💻 Autor
+---
 
-Projeto desenvolvido por Állan R. Vieira
+## 👨‍💻 Autor
+Projeto desenvolvido por Állan R. Vieira.
 
 ---
 
 ## 📄 Licença
-
-Projeto privado em desenvolvimento.
-Todos os direitos reservados.
->>>>>>> ea7830ea58b2ef1d237c890ccd8ff89e3e61d6c6
+Projeto privado em desenvolvimento. Todos os direitos reservados.
