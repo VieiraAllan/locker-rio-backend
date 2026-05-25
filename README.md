@@ -75,4 +75,5 @@ locker-rio-backend/
 ```
 
 👨‍💻 Autor
+
 Projeto desenvolvido por Állan R. Vieira
