@@ -74,13 +74,13 @@ locker-rio-backend/
 └── README.md
 ```
 
-##👨‍💻 Autor
+## 👨‍💻 Autor
 
 Projeto desenvolvido por Állan R. Vieira
 
 ---
 
-##📄 Licença
+## 📄 Licença
 
 Projeto privado em desenvolvimento.
 Todos os direitos reservados.
