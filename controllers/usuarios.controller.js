@@ -48,6 +48,10 @@ async function buscarUsuarioPorId(id) {
 }
 
 async function obterUsuarioAtual(req) {
+  if (req.usuario) {
+    return req.usuario;
+  }
+
   const usuarioId = req.headers['x-usuario-id'];
 
   if (!usuarioId) {

@@ -1,5 +1,7 @@
 import express from 'express';
 
+import { autenticarUsuario } from '../middlewares/auth.middleware.js';
+
 import {
   listarUsuarios,
   criarUsuario,
@@ -9,6 +11,11 @@ import {
 } from '../controllers/usuarios.controller.js';
 
 const router = express.Router();
+
+/* =========================
+   TODAS AS ROTAS ABAIXO EXIGEM TOKEN
+========================= */
+router.use(autenticarUsuario);
 
 /* =========================
    LISTAR USUÁRIOS

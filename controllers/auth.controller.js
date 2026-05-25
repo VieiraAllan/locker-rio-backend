@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase.js';
 import { verificarSenha } from '../lib/senhas.js';
+import { gerarTokenUsuario } from '../lib/tokens.js';
 
 function normalizarUsuario(usuario) {
   return {
@@ -120,12 +121,16 @@ export async function login(req, res) {
       });
     }
 
+    const usuarioNormalizado = normalizarUsuario(usuarioAtualizado);
+    const token = gerarTokenUsuario(usuarioNormalizado);
+
     return res.json({
-      success: true,
-      data: {
-        usuario: normalizarUsuario(usuarioAtualizado)
-      }
-    });
+        success: true,
+        data: {
+        usuario: usuarioNormalizado,
+        token
+    }
+    }); 
 
   } catch (err) {
     console.error('ERRO LOGIN:', err);
