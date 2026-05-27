@@ -66,3 +66,23 @@ export async function autenticarUsuario(req, res, next) {
     });
   }
 }
+
+export function permitirPerfis(...perfisPermitidos) {
+  return function verificarPerfil(req, res, next) {
+    if (!req.usuario || !req.usuario.perfil) {
+      return res.status(401).json({
+        success: false,
+        error: 'Usuário não autenticado'
+      });
+    }
+
+    if (!perfisPermitidos.includes(req.usuario.perfil)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Você não tem permissão para acessar este recurso'
+      });
+    }
+
+    return next();
+  };
+}
