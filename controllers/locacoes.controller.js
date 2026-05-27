@@ -539,9 +539,13 @@ export async function listarLocacoesAtivas(req, res) {
 
 /* =========================
    LISTAR HISTÓRICO DE LOCAÇÕES
+   Versão otimizada — evita N+1 queries
 ========================= */
 export async function listarHistoricoLocacoes(req, res) {
   try {
+    /* =========================
+       1. BUSCAR LOCAÇÕES FINALIZADAS
+    ========================= */
     const { data: locacoes, error: locacoesError } = await supabase
       .from('locacoes')
       .select(`
@@ -571,64 +575,144 @@ export async function listarHistoricoLocacoes(req, res) {
       });
     }
 
-    const resultado = [];
+    if (!locacoes || locacoes.length === 0) {
+      return res.json({
+        success: true,
+        data: []
+      });
+    }
 
-    for (const locacao of locacoes || []) {
-      const { data: relacoesLockers, error: relacoesError } = await supabase
-        .from('locacao_lockers')
-        .select('locker_id')
-        .eq('locacao_id', locacao.id);
+    const locacaoIds = locacoes.map(locacao => locacao.id);
 
-      if (relacoesError) {
+    /* =========================
+       2. BUSCAR TODAS AS RELAÇÕES COM LOCKERS EM LOTE
+    ========================= */
+    const { data: relacoesLockers, error: relacoesError } = await supabase
+      .from('locacao_lockers')
+      .select('locacao_id, locker_id')
+      .in('locacao_id', locacaoIds);
+
+    if (relacoesError) {
+      return res.status(500).json({
+        success: false,
+        error: relacoesError.message
+      });
+    }
+
+    const relacoes = relacoesLockers || [];
+
+    const lockerIdsUnicos = [
+      ...new Set(
+        relacoes
+          .map(relacao => relacao.locker_id)
+          .filter(Boolean)
+      )
+    ];
+
+    /* =========================
+       3. BUSCAR TODOS OS LOCKERS RELACIONADOS EM LOTE
+    ========================= */
+    let lockers = [];
+
+    if (lockerIdsUnicos.length > 0) {
+      const { data: lockersData, error: lockersError } = await supabase
+        .from('lockers')
+        .select('id, numero')
+        .in('id', lockerIdsUnicos)
+        .order('numero');
+
+      if (lockersError) {
         return res.status(500).json({
           success: false,
-          error: relacoesError.message
+          error: lockersError.message
         });
       }
 
-      const lockerIds = (relacoesLockers || []).map(
-        relacao => relacao.locker_id
-      );
+      lockers = lockersData || [];
+    }
 
-      let lockersNumeros = [];
+    /* =========================
+       4. BUSCAR TODAS AS BAGAGENS EXTRAS EM LOTE
+    ========================= */
+    const { data: bagagensData, error: bagagensError } = await supabase
+      .from('bagagens_extras')
+      .select('locacao_id, descricao, quantidade')
+      .in('locacao_id', locacaoIds);
 
-      if (lockerIds.length > 0) {
-        const { data: lockers, error: lockersError } = await supabase
-          .from('lockers')
-          .select('numero')
-          .in('id', lockerIds)
-          .order('numero');
+    if (bagagensError) {
+      return res.status(500).json({
+        success: false,
+        error: bagagensError.message
+      });
+    }
 
-        if (lockersError) {
-          return res.status(500).json({
-            success: false,
-            error: lockersError.message
-          });
+    const bagagensExtras = bagagensData || [];
+
+    /* =========================
+       5. MONTAR MAPAS EM MEMÓRIA
+    ========================= */
+
+    const numeroLockerPorId = new Map();
+
+    lockers.forEach(locker => {
+      numeroLockerPorId.set(locker.id, locker.numero);
+    });
+
+    const lockersPorLocacao = new Map();
+
+    relacoes.forEach(relacao => {
+      const numeroLocker = numeroLockerPorId.get(relacao.locker_id);
+
+      if (!numeroLocker) {
+        return;
+      }
+
+      if (!lockersPorLocacao.has(relacao.locacao_id)) {
+        lockersPorLocacao.set(relacao.locacao_id, []);
+      }
+
+      lockersPorLocacao.get(relacao.locacao_id).push(numeroLocker);
+    });
+
+    const bagagensPorLocacao = new Map();
+
+    bagagensExtras.forEach(bagagem => {
+      if (!bagagensPorLocacao.has(bagagem.locacao_id)) {
+        bagagensPorLocacao.set(bagagem.locacao_id, []);
+      }
+
+      bagagensPorLocacao.get(bagagem.locacao_id).push({
+        descricao: bagagem.descricao,
+        quantidade: Number(bagagem.quantidade || 0)
+      });
+    });
+
+    /* =========================
+       6. MONTAR RESPOSTA FINAL
+    ========================= */
+    const resultado = locacoes.map(locacao => {
+      const lockersNumeros = lockersPorLocacao.get(locacao.id) || [];
+      const bagagens = bagagensPorLocacao.get(locacao.id) || [];
+
+      lockersNumeros.sort((a, b) => {
+        const numeroA = Number(a);
+        const numeroB = Number(b);
+
+        if (!Number.isNaN(numeroA) && !Number.isNaN(numeroB)) {
+          return numeroA - numeroB;
         }
 
-        lockersNumeros = (lockers || []).map(locker => locker.numero);
-      }
+        return String(a).localeCompare(String(b), 'pt-BR');
+      });
 
-      const { data: bagagens, error: bagagensError } = await supabase
-        .from('bagagens_extras')
-        .select('descricao, quantidade')
-        .eq('locacao_id', locacao.id);
-
-      if (bagagensError) {
-        return res.status(500).json({
-          success: false,
-          error: bagagensError.message
-        });
-      }
-
-      const totalVolumes = (bagagens || []).reduce(
-        (total, bagagem) => total + bagagem.quantidade,
+      const totalVolumes = bagagens.reduce(
+        (total, bagagem) => total + Number(bagagem.quantidade || 0),
         0
       );
 
-      const tipo = lockerIds.length > 0 ? 'locker' : 'avulsa';
+      const tipo = lockersNumeros.length > 0 ? 'locker' : 'avulsa';
 
-      resultado.push({
+      return {
         id: locacao.id,
         recibo_numero: locacao.recibo_numero,
         data: locacao.data,
@@ -642,13 +726,13 @@ export async function listarHistoricoLocacoes(req, res) {
         lacres: locacao.lacres,
         tipo,
         lockers: lockersNumeros,
-        bagagens: bagagens || [],
+        bagagens,
         total_volumes: totalVolumes,
         usuario_abertura_id: locacao.usuario_abertura_id,
         usuario_abertura_nome: locacao.usuario_abertura_nome,
-        usuario_abertura_perfil: locacao.usuario_abertura_perfil,
-      });
-    }
+        usuario_abertura_perfil: locacao.usuario_abertura_perfil
+      };
+    });
 
     return res.json({
       success: true,
