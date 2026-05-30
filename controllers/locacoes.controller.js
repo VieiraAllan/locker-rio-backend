@@ -1,14 +1,37 @@
 import { supabase } from '../lib/supabase.js';
 
+function obterDataLocalISO(date = new Date()) {
+  const ano = date.getFullYear();
+  const mes = String(date.getMonth() + 1).padStart(2, '0');
+  const dia = String(date.getDate()).padStart(2, '0');
+
+  return `${ano}-${mes}-${dia}`;
+}
+
 /* =========================
    UTIL — HORAS EXCEDENTES
 ========================= */
-function calcularHorasCheiasExcedentes(dataLocacao, horaPagoAte) {
+function calcularHorasCheiasExcedentes(
+  dataLocacao,
+  horaEntrada,
+  horaPagoAte
+) {
   const agora = new Date();
   const dataHoraPagoAte = new Date(`${dataLocacao}T${horaPagoAte}`);
 
+  if (
+    horaEntrada &&
+    horaPagoAte &&
+    String(horaPagoAte) < String(horaEntrada)
+  ) {
+    dataHoraPagoAte.setDate(dataHoraPagoAte.getDate() + 1);
+  }
+
   const diffMs = agora - dataHoraPagoAte;
-  if (diffMs <= 0) return 0;
+
+  if (diffMs <= 0) {
+    return 0;
+  }
 
   const diffHoras = diffMs / (1000 * 60 * 60);
   return Math.floor(diffHoras);
@@ -139,14 +162,15 @@ export async function criarLocacao(req, res) {
     }
 
     /* ===== datas ===== */
-    const agora = new Date();
-    const dataLocacao = agora.toISOString().split('T')[0];
-    const horaEntrada = agora.toTimeString().slice(0, 8);
-    const horaPagoAte = new Date(
-      agora.getTime() + configuracoes.horasInclusas * 60 * 60 * 1000
-    )
-      .toTimeString()
-      .slice(0, 8);
+const agora = new Date();
+const dataLocacao = obterDataLocalISO(agora);
+const horaEntrada = agora.toTimeString().slice(0, 8);
+
+const dataHoraPagoAte = new Date(
+  agora.getTime() + configuracoes.horasInclusas * 60 * 60 * 1000
+);
+
+const horaPagoAte = dataHoraPagoAte.toTimeString().slice(0, 8);
 
     /* ===== valor inicial ===== */
     let valorFinal = 0;
@@ -284,8 +308,10 @@ export async function finalizarLocacao(req, res) {
       /* ===== excedente ===== */
       const horasExcedentes = calcularHorasCheiasExcedentes(
         locacao.data,
+        locacao.hora_entrada,
         locacao.hora_pago_ate
       );
+
 
       let valorExcedente = 0;
 
