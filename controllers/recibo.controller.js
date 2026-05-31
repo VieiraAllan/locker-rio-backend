@@ -217,12 +217,16 @@ export async function gerarReciboPDF(req, res) {
     }
 
     /* =========================
-       VALOR
+             VALOR
     ========================= */
+    const valorPagoInicial = Number(
+      locacao.valor_pago_inicial ?? locacao.valor_pago ?? 0
+    );
+
     doc
       .fontSize(16)
       .text(
-        `VALOR TOTAL: ${formatarValor(locacao.valor_pago)}`,
+        `VALOR PAGO: ${formatarValor(valorPagoInicial)}`,
         { align: 'right' }
       );
 
@@ -236,15 +240,13 @@ export async function gerarReciboPDF(req, res) {
     doc.fontSize(10);
 
     const termos = [
-      `1. A ${configuracoes.nomeEstabelecimento || 'Locker Rio'} se compromete a disponibilizar o serviço contratado para guarda de volumes durante o período informado neste recibo.`,
-      '2. O cliente declara estar ciente dos dados da locação, horários, valores e identificação dos volumes registrados.',
-      '3. A perda ou extravio de chave, identificação, comprovante ou lacre poderá gerar cobrança adicional, quando aplicável.',
-      `4. O valor base do locker é ${formatarValor(configuracoes.valorLocker)} por até ${configuracoes.horasInclusas}h, conforme configuração vigente no sistema.`,
-      `5. O valor de bagagem extra/avulsa é ${formatarValor(configuracoes.valorBagagemAvulsa)} por volume, conforme configuração vigente no sistema.`,
-      `6. Em caso de permanência além do horário contratado, o cliente concorda com a cobrança adicional de ${formatarValor(configuracoes.valorHoraExcedente)} por hora cheia excedente, quando aplicável.`,
-      '7. A Locker Rio não se responsabiliza por objetos de alto valor deixados no interior do locker ou volumes, como dinheiro em espécie, joias, documentos ou equipamentos eletrônicos.',
-      '8. O horário de funcionamento é das 09h às 18h, com tolerância de 30 minutos; após este período, a unidade será encerrada e a retirada dos volumes só poderá ser realizada no dia seguinte, mediante pagamento de multa, quando aplicável.'
-    ];
+  '1. A Locker Rio se compromete a disponibilizar o(s) locker(s) acima identificado(s) para guarda de volumes durante o período contratado.',
+  '2. O cliente declara que recebeu a(s) chave(s) do(s) locker(s) e está ciente de que somente com a chave é possível realizar a abertura.',
+  '3. A perda ou extravio da chave poderá gerar cobrança de taxa adicional, referente à substituição e/ou abertura do locker.',
+  '4. Em caso de permanência além do horário contratado, o cliente concorda com a cobrança adicional de R$5,00 (cinco reais) por hora excedente.',
+  '5. A Locker Rio não se responsabiliza por objetos de alto valor deixados no interior do locker, como dinheiro em espécie, jóias, documentos ou equipamentos eletrônicos.',
+  '6. O horário de funcionamento é das 09h às 18h, com tolerância de 30 minutos; após este período, a unidade será encerrada e a retirada dos volumes só poderá ser realizada no dia seguinte, mediante pagamento de multa.'
+];
 
     termos.forEach(termo => {
       doc.text(termo);
