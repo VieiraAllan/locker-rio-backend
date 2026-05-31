@@ -161,51 +161,62 @@ export async function criarLocacao(req, res) {
       }
     }
 
-    /* ===== datas ===== */
-const agora = new Date();
-const dataLocacao = obterDataLocalISO(agora);
-const horaEntrada = agora.toTimeString().slice(0, 8);
+/* ===== datas ===== */
+  const agora = new Date();
+  const dataLocacao = obterDataLocalISO(agora);
+  const horaEntrada = agora.toTimeString().slice(0, 8);
 
-const dataHoraPagoAte = new Date(
-  agora.getTime() + configuracoes.horasInclusas * 60 * 60 * 1000
-);
+  const dataHoraPagoAte = new Date(
+    agora.getTime() + configuracoes.horasInclusas * 60 * 60 * 1000
+  );
 
 const horaPagoAte = dataHoraPagoAte.toTimeString().slice(0, 8);
 
     /* ===== valor inicial ===== */
-    let valorFinal = 0;
+let valorPagoInicial = 0;
 
-      if (!inRioTourEfetivo) {
-      if (!isAvulsa) {
-         valorFinal += configuracoes.valorLocker * locker_ids.length;
-         }
+if (!inRioTourEfetivo) {
+  if (!isAvulsa) {
+    valorPagoInicial += configuracoes.valorLocker * locker_ids.length;
+  }
 
-      for (const bagagem of bagagens_externas) {
-          valorFinal += configuracoes.valorBagagemAvulsa * bagagem.quantidade;
-        }
-      }
+  for (const bagagem of bagagens_externas) {
+    valorPagoInicial +=
+      configuracoes.valorBagagemAvulsa * bagagem.quantidade;
+  }
+}
 
-    const reciboNumero = `LR-${Date.now()}`;
+const valorPagoFinal = 0;
+const valorTotal = valorPagoInicial + valorPagoFinal;
+
+const reciboNumero = `LR-${Date.now()}`;
 
     const { data: locacao, error: locacaoError } = await supabase
-      .from('locacoes')
-      .insert({
-        recibo_numero: reciboNumero,
-        data: dataLocacao,
-        hora_entrada: horaEntrada,
-        hora_pago_ate: horaPagoAte,
-        valor_pago: valorFinal,
-        status: 'ativa',
-        cliente_nome,
-        cliente_telefone,
-        cliente_documento,
-        lacres: String(lacres || '').trim(),
-        usuario_abertura_id,
-        usuario_abertura_nome,
-        usuario_abertura_perfil
-      })
-      .select()
-      .single();
+  .from('locacoes')
+  .insert({
+    recibo_numero: reciboNumero,
+    data: dataLocacao,
+    hora_entrada: horaEntrada,
+    hora_pago_ate: horaPagoAte,
+
+    valor_pago_inicial: valorPagoInicial,
+    valor_pago_final: valorPagoFinal,
+    valor_total: valorTotal,
+
+    /* compatibilidade temporária com o sistema atual */
+    valor_pago: valorTotal,
+
+    status: 'ativa',
+    cliente_nome,
+    cliente_telefone,
+    cliente_documento,
+    lacres: String(lacres || '').trim(),
+    usuario_abertura_id,
+    usuario_abertura_nome,
+    usuario_abertura_perfil
+  })
+  .select()
+  .single();
 
     if (locacaoError) {
       return res.status(500).json({
@@ -290,17 +301,17 @@ export async function finalizarLocacao(req, res) {
       .select('locker_id')
       .eq('locacao_id', id);
 
-    const qtdLockers = lockersRelacao.length;
+    const qtdLockers = (lockersRelacao || []).length;
 
-    const { data: bagagens } = await supabase
-      .from('bagagens_extras')
-      .select('quantidade')
-      .eq('locacao_id', id);
+const { data: bagagens } = await supabase
+  .from('bagagens_extras')
+  .select('quantidade')
+  .eq('locacao_id', id);
 
-    const totalBagagens = bagagens.reduce(
-      (t, b) => t + b.quantidade,
-      0
-    );
+const totalBagagens = (bagagens || []).reduce(
+  (t, b) => t + Number(b.quantidade || 0),
+  0
+);
 
           /* ===== configurações ===== */
       const configuracoes = await obterConfiguracoesSistema();
@@ -313,28 +324,34 @@ export async function finalizarLocacao(req, res) {
       );
 
 
-      let valorExcedente = 0;
+      let valorPagoFinal = 0;
 
-      if (horasExcedentes > 0) {
-        if (valor_excedente_manual !== null) {
-          valorExcedente = valor_excedente_manual;
-        } else {
-          valorExcedente =
-            horasExcedentes *
-            configuracoes.valorHoraExcedente *
-            (qtdLockers + totalBagagens);
-        }
-      }
+if (horasExcedentes > 0) {
+  if (valor_excedente_manual !== null) {
+    valorPagoFinal = Number(valor_excedente_manual || 0);
+  } else {
+    valorPagoFinal =
+      horasExcedentes *
+      configuracoes.valorHoraExcedente *
+      (qtdLockers + totalBagagens);
+  }
+}
 
-    const valorFinal = locacao.valor_pago + valorExcedente;
+const valorPagoInicial = Number(locacao.valor_pago_inicial || 0);
+const valorTotal = valorPagoInicial + valorPagoFinal;
 
     await supabase
-      .from('locacoes')
-      .update({
-        valor_pago: valorFinal,
-        status: 'finalizada'
-      })
-      .eq('id', id);
+  .from('locacoes')
+  .update({
+    valor_pago_final: valorPagoFinal,
+    valor_total: valorTotal,
+
+    /* compatibilidade temporária com o sistema atual */
+    valor_pago: valorTotal,
+
+    status: 'finalizada'
+  })
+  .eq('id', id);
 
     if (qtdLockers > 0) {
       const lockerIds = lockersRelacao.map(l => l.locker_id);
@@ -346,9 +363,11 @@ export async function finalizarLocacao(req, res) {
     }
 
     return res.json({
-      success: true,
-      valor_final: valorFinal
-    });
+  success: true,
+  valor_pago_inicial: valorPagoInicial,
+  valor_pago_final: valorPagoFinal,
+  valor_total: valorTotal
+});
 
   } catch {
     return res.status(500).json({
