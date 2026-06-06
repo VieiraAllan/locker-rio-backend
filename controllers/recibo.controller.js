@@ -9,6 +9,21 @@ function formatarValor(valor) {
   return `R$ ${numero.toFixed(2).replace('.', ',')}`;
 }
 
+function formatarData(data) {
+  if (!data) {
+    return '—';
+  }
+
+  const partes = String(data).split('-');
+
+  if (partes.length !== 3) {
+    return data;
+  }
+
+  const [ano, mes, dia] = partes;
+  return `${dia}-${mes}-${ano}`;
+}
+
 async function buscarConfiguracoesSistema() {
   const { data, error } = await supabase
     .from('configuracoes_sistema')
@@ -176,7 +191,7 @@ export async function gerarReciboPDF(req, res) {
     doc.fontSize(11);
     doc.text(`Recibo Nº: ${locacao.recibo_numero || '—'}`);
     doc.text(`Tipo: ${isAvulsa ? 'Bagagem avulsa' : 'Locker'}`);
-    doc.text(`Data: ${locacao.data || '—'}`);
+    doc.text(`Data: ${formatarData(locacao.data)}`);
     doc.text(`Entrada: ${locacao.hora_entrada || '—'}`);
     doc.text(`Pago até: ${locacao.hora_pago_ate || '—'}`);
 
@@ -217,18 +232,18 @@ export async function gerarReciboPDF(req, res) {
     }
 
     /* =========================
-             VALOR
-    ========================= */
-    const valorPagoInicial = Number(
-      locacao.valor_pago_inicial ?? locacao.valor_pago ?? 0
-    );
+   VALOR
+========================= */
+const valorPagoInicial = Number(
+  locacao.valor_pago_inicial ?? locacao.valor_pago ?? 0
+);
 
-    doc
-      .fontSize(16)
-      .text(
-        `VALOR PAGO: ${formatarValor(valorPagoInicial)}`,
-        { align: 'right' }
-      );
+doc
+  .fontSize(16)
+  .text(
+    `VALOR PAGO: ${formatarValor(valorPagoInicial)}`,
+    { align: 'right' }
+  );
 
     doc.moveDown(2);
 

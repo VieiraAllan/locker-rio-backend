@@ -90,7 +90,8 @@ export async function criarLocacao(req, res) {
       lacres = '',
       usuario_abertura_id = null,
       usuario_abertura_nome = null,
-      usuario_abertura_perfil = null
+      usuario_abertura_perfil = null,
+      valor_pago_inicial = null,
     } = req.body;
 
     const configuracoes = await obterConfiguracoesSistema();
@@ -172,22 +173,42 @@ export async function criarLocacao(req, res) {
 
 const horaPagoAte = dataHoraPagoAte.toTimeString().slice(0, 8);
 
-    /* ===== valor inicial ===== */
-let valorPagoInicial = 0;
+    /* ===== valor total devido da locação ===== */
+let valorTotal = 0;
 
 if (!inRioTourEfetivo) {
   if (!isAvulsa) {
-    valorPagoInicial += configuracoes.valorLocker * locker_ids.length;
+    valorTotal += configuracoes.valorLocker * locker_ids.length;
   }
 
   for (const bagagem of bagagens_externas) {
-    valorPagoInicial +=
+    valorTotal +=
       configuracoes.valorBagagemAvulsa * bagagem.quantidade;
   }
 }
 
+/* ===== quanto o cliente realmente pagou na abertura ===== */
+const valorPagoInicial =
+  valor_pago_inicial !== null && valor_pago_inicial !== undefined
+    ? Number(valor_pago_inicial || 0)
+    : valorTotal;
+
+if (!Number.isFinite(valorPagoInicial) || valorPagoInicial < 0) {
+  return res.status(400).json({
+    success: false,
+    error: 'Valor pago inicial inválido'
+  });
+}
+
+if (valorPagoInicial > valorTotal) {
+  return res.status(400).json({
+    success: false,
+    error: 'Valor pago inicial não pode ser maior que o valor total da locação'
+  });
+}
+
+/* ===== na abertura ainda não existe pagamento final ===== */
 const valorPagoFinal = 0;
-const valorTotal = valorPagoInicial + valorPagoFinal;
 
 const reciboNumero = `LR-${Date.now()}`;
 
@@ -281,7 +302,10 @@ const reciboNumero = `LR-${Date.now()}`;
 export async function finalizarLocacao(req, res) {
   try {
     const { id } = req.params;
-    const { valor_excedente_manual = null } = req.body;
+    const {
+      valor_excedente_manual = null,
+      valor_pago_final = null
+    } = req.body;
 
     const { data: locacao, error: locacaoError } = await supabase
       .from('locacoes')
@@ -324,21 +348,51 @@ const totalBagagens = (bagagens || []).reduce(
       );
 
 
-      let valorPagoFinal = 0;
+      /* ===== custo adicional / excedente devido no fechamento ===== */
+let valorExcedenteCalculado = 0;
 
 if (horasExcedentes > 0) {
   if (valor_excedente_manual !== null) {
-    valorPagoFinal = Number(valor_excedente_manual || 0);
+    valorExcedenteCalculado = Number(valor_excedente_manual || 0);
   } else {
-    valorPagoFinal =
+    valorExcedenteCalculado =
       horasExcedentes *
       configuracoes.valorHoraExcedente *
       (qtdLockers + totalBagagens);
   }
 }
 
+/* ===== valor base devido da locação ===== */
+const valorBaseOriginal = Number(
+  locacao.valor_total || locacao.valor_pago || 0
+);
+
+/* ===== valor total devido da locação ===== */
+const valorTotal = valorBaseOriginal + valorExcedenteCalculado;
+
 const valorPagoInicial = Number(locacao.valor_pago_inicial || 0);
-const valorTotal = valorPagoInicial + valorPagoFinal;
+
+/* ===== quanto o cliente realmente pagou no fechamento ===== */
+const valorPagoFinal =
+  valor_pago_final !== null && valor_pago_final !== undefined
+    ? Number(valor_pago_final || 0)
+    : valorExcedenteCalculado;
+
+if (!Number.isFinite(valorPagoFinal) || valorPagoFinal < 0) {
+  return res.status(400).json({
+    success: false,
+    error: 'Valor pago final inválido'
+  });
+}
+
+const valorPendenteAtual = valorTotal - valorPagoInicial;
+
+if (valorPagoFinal > valorPendenteAtual) {
+  return res.status(400).json({
+    success: false,
+    error: 'Valor pago final não pode ser maior que o valor pendente'
+  });
+}
 
     await supabase
   .from('locacoes')
@@ -363,11 +417,12 @@ const valorTotal = valorPagoInicial + valorPagoFinal;
     }
 
     return res.json({
-  success: true,
-  valor_pago_inicial: valorPagoInicial,
-  valor_pago_final: valorPagoFinal,
-  valor_total: valorTotal
-});
+      success: true,
+      valor_pago_inicial: valorPagoInicial,
+      valor_pago_final: valorPagoFinal,
+      valor_total: valorTotal,
+      valor_pendente: valorTotal - valorPagoInicial - valorPagoFinal
+    });
 
   } catch {
     return res.status(500).json({
@@ -471,7 +526,10 @@ export async function listarLocacoesAtivas(req, res) {
         data,
         hora_entrada,
         hora_pago_ate,
-        valor_pago,
+        valor_pago,        
+        valor_pago_inicial,
+        valor_pago_final,
+        valor_total,
         status,
         cliente_nome,
         cliente_telefone,
@@ -634,7 +692,12 @@ export async function listarLocacoesAtivas(req, res) {
         data: locacao.data,
         hora_entrada: locacao.hora_entrada,
         hora_pago_ate: locacao.hora_pago_ate,
+
         valor_pago: locacao.valor_pago,
+        valor_pago_inicial: locacao.valor_pago_inicial,
+        valor_pago_final: locacao.valor_pago_final,
+        valor_total: locacao.valor_total,
+
         status: locacao.status,
         cliente_nome: locacao.cliente_nome,
         cliente_telefone: locacao.cliente_telefone,
@@ -683,6 +746,9 @@ export async function listarHistoricoLocacoes(req, res) {
         hora_entrada,
         hora_pago_ate,
         valor_pago,
+        valor_pago_inicial,
+        valor_pago_final,
+        valor_total,
         status,
         cliente_nome,
         cliente_telefone,
@@ -692,6 +758,7 @@ export async function listarHistoricoLocacoes(req, res) {
         usuario_abertura_nome,
         usuario_abertura_perfil
       `)
+
       .eq('status', 'finalizada')
       .order('data', { ascending: false })
       .order('hora_entrada', { ascending: false });
@@ -846,7 +913,12 @@ export async function listarHistoricoLocacoes(req, res) {
         data: locacao.data,
         hora_entrada: locacao.hora_entrada,
         hora_pago_ate: locacao.hora_pago_ate,
+
         valor_pago: locacao.valor_pago,
+        valor_pago_inicial: locacao.valor_pago_inicial,
+        valor_pago_final: locacao.valor_pago_final,
+        valor_total: locacao.valor_total,
+
         status: locacao.status,
         cliente_nome: locacao.cliente_nome,
         cliente_telefone: locacao.cliente_telefone,
