@@ -1,14 +1,15 @@
 import express from 'express';
-import {
-  mensagemInicio,
-  mensagemAtraso,
-  mensagemFinalizacao
-} from '../controllers/mensagens.controller.js';
+import { gerarMensagemWhatsApp } from '../controllers/mensagens.controller.js';
 
 const router = express.Router();
 
-router.get('/:id/inicio', mensagemInicio);
-router.get('/:id/atraso', mensagemAtraso);
-router.get('/:id/finalizacao', mensagemFinalizacao);
+/*
+  Exemplos:
+  GET /mensagens/123/finalizacao?telefone=5521999999999&idioma=pt
+  GET /mensagens/123/abertura?telefone=5521999999999&idioma=en
+  GET /mensagens/123/atraso?telefone=5521999999999&idioma=es
+  GET /mensagens/123/fechamento_proximo?telefone=5521999999999&idioma=pt
+*/
+router.get('/:id/:tipo', gerarMensagemWhatsApp);
 
 export default router;
