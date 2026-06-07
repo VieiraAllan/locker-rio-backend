@@ -400,7 +400,7 @@ export async function gerarMensagemWhatsApp(req, res) {
     const mensagem = renderizarTemplate(template, variaveis);
 
     const whatsappLink = telefone
-      ? `https://wa.me/${telefone}?text=${encodeURIComponent(mensagem)}`
+      ? `https://api.whatsapp.com/send?phone=${telefone}&text=${encodeURIComponent(mensagem)}`
       : '';
 
     return res.json({
