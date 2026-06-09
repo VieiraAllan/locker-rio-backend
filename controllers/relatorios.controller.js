@@ -63,7 +63,23 @@ function obterPeriodo(query) {
 ========================= */
 export async function resumoRelatorio(req, res) {
   try {
+    const { inicio, fim } = req.query;
+
+    if ((inicio && !fim) || (!inicio && fim)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Para filtro personalizado, informe data inicial e data final.'
+      });
+    }
+
     const periodoInfo = obterPeriodo(req.query);
+
+    if (periodoInfo.inicio > periodoInfo.fim) {
+      return res.status(400).json({
+        success: false,
+        error: 'A data inicial não pode ser maior que a data final.'
+      });
+    }
 
     const { data: locacoes, error: locacoesError } = await supabase
       .from('locacoes')
@@ -74,6 +90,9 @@ export async function resumoRelatorio(req, res) {
         hora_entrada,
         hora_pago_ate,
         valor_pago,
+        valor_pago_inicial,
+        valor_pago_final,
+        valor_total,
         status,
         cliente_nome,
         cliente_telefone,
@@ -153,15 +172,18 @@ export async function resumoRelatorio(req, res) {
       }
 
       const totalVolumes = (bagagens || []).reduce(
-        (total, bagagem) => total + bagagem.quantidade,
+        (total, bagagem) => total + Number(bagagem.quantidade || 0),
         0
       );
 
       const tipo = lockerIds.length > 0 ? 'locker' : 'avulsa';
+      const valorRecebido =
+        Number(locacao.valor_pago_inicial || 0) +
+        Number(locacao.valor_pago_final || 0);
 
       if (locacao.status === 'finalizada') {
         totalFinalizadas += 1;
-        totalFaturado += Number(locacao.valor_pago || 0);
+        totalFaturado += valorRecebido;
 
         if (tipo === 'locker') {
           totalComLocker += 1;
@@ -181,7 +203,11 @@ export async function resumoRelatorio(req, res) {
         data: locacao.data,
         hora_entrada: locacao.hora_entrada,
         hora_pago_ate: locacao.hora_pago_ate,
-        valor_pago: locacao.valor_pago,
+        valor_pago: valorRecebido,
+        valor_recebido: valorRecebido,
+        valor_pago_inicial: Number(locacao.valor_pago_inicial || 0),
+        valor_pago_final: Number(locacao.valor_pago_final || 0),
+        valor_total: Number(locacao.valor_total || 0),
         status: locacao.status,
         cliente_nome: locacao.cliente_nome,
         cliente_telefone: locacao.cliente_telefone,
@@ -193,7 +219,7 @@ export async function resumoRelatorio(req, res) {
         total_volumes: totalVolumes,
         usuario_abertura_id: locacao.usuario_abertura_id,
         usuario_abertura_nome: locacao.usuario_abertura_nome,
-        usuario_abertura_perfil: locacao.usuario_abertura_perfil,
+        usuario_abertura_perfil: locacao.usuario_abertura_perfil
       });
     }
 
@@ -218,7 +244,6 @@ export async function resumoRelatorio(req, res) {
         locacoes: detalhes
       }
     });
-
   } catch (err) {
     console.error('ERRO RELATÓRIO RESUMO:', err);
 
