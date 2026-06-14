@@ -1,7 +1,13 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import PDFDocument from 'pdfkit';
 import { supabase } from '../lib/supabase.js';
 
 const COR_INSTITUCIONAL = '#F2B705';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const LOGO_PATH = path.resolve(__dirname, '../assets/logo-cliente.png');
 
 function formatarValor(valor) {
   const numero = Number(valor || 0);
@@ -126,8 +132,6 @@ export async function gerarReciboPDF(req, res) {
     } = await buscarDadosRecibo(id);
 
     const isAvulsa = lockers.length === 0;
-    const numerosLockers = lockers.map(locker => locker.numero).join(', ');
-
     const doc = new PDFDocument({ margin: 40 });
 
     res.setHeader('Content-Type', 'application/pdf');
@@ -141,34 +145,75 @@ export async function gerarReciboPDF(req, res) {
     /* =========================
        CABEÇALHO
     ========================= */
+    const margemEsquerda = 40;
+    const larguraUtil = 550 - 40;
+    const topoY = 24;
+    const logoWidth = 110;
+    const logoHeight = 44;
+
+    if (fs.existsSync(LOGO_PATH)) {
+      doc.image(LOGO_PATH, (doc.page.width - logoWidth) / 2, topoY, {
+        fit: [logoWidth, logoHeight],
+        align: 'center',
+        valign: 'center'
+      });
+    }
+
+    const tituloY = topoY + logoHeight + 8;
+
     doc
       .fillColor(COR_INSTITUCIONAL)
       .fontSize(22)
-      .text((configuracoes.nomeEstabelecimento || 'LOCKER RIO').toUpperCase(), {
-        align: 'center'
-      });
+      .text(
+        (configuracoes.nomeEstabelecimento || 'LOCKER RIO').toUpperCase(),
+        margemEsquerda,
+        tituloY,
+        {
+          width: larguraUtil,
+          align: 'center'
+        }
+      );
 
     doc
       .fontSize(12)
-      .text('Guarda-volumes e bagagens', { align: 'center' });
+      .text(
+        'Guarda-volumes e bagagens',
+        margemEsquerda,
+        tituloY + 24,
+        {
+          width: larguraUtil,
+          align: 'center'
+        }
+      );
+
+    const enderecoY = tituloY + 40;
 
     if (configuracoes.enderecoEstabelecimento) {
       doc
         .fontSize(9)
-        .text(configuracoes.enderecoEstabelecimento, { align: 'center' });
+        .text(
+          configuracoes.enderecoEstabelecimento,
+          margemEsquerda,
+          enderecoY,
+          {
+            width: larguraUtil,
+            align: 'center'
+          }
+        );
     }
 
-    doc.moveDown(0.8);
+    const linhaY = configuracoes.enderecoEstabelecimento
+      ? enderecoY + 18
+      : tituloY + 46;
 
     doc
       .strokeColor(COR_INSTITUCIONAL)
       .lineWidth(1)
-      .moveTo(40, doc.y)
-      .lineTo(550, doc.y)
+      .moveTo(40, linhaY)
+      .lineTo(550, linhaY)
       .stroke();
 
-    doc.moveDown(1);
-
+    doc.y = linhaY + 16;
     doc.fillColor('black').strokeColor('black');
 
     /* =========================
@@ -232,18 +277,18 @@ export async function gerarReciboPDF(req, res) {
     }
 
     /* =========================
-   VALOR
-========================= */
-const valorPagoInicial = Number(
-  locacao.valor_pago_inicial ?? locacao.valor_pago ?? 0
-);
+       VALOR
+    ========================= */
+    const valorPagoInicial = Number(
+      locacao.valor_pago_inicial ?? locacao.valor_pago ?? 0
+    );
 
-doc
-  .fontSize(16)
-  .text(
-    `VALOR PAGO: ${formatarValor(valorPagoInicial)}`,
-    { align: 'right' }
-  );
+    doc
+      .fontSize(16)
+      .text(
+        `VALOR PAGO: ${formatarValor(valorPagoInicial)}`,
+        { align: 'right' }
+      );
 
     doc.moveDown(2);
 
@@ -255,13 +300,13 @@ doc
     doc.fontSize(10);
 
     const termos = [
-  '1. A Locker Rio se compromete a disponibilizar o(s) locker(s) acima identificado(s) para guarda de volumes durante o período contratado.',
-  '2. O cliente declara que recebeu a(s) chave(s) do(s) locker(s) e está ciente de que somente com a chave é possível realizar a abertura.',
-  '3. A perda ou extravio da chave poderá gerar cobrança de taxa adicional, referente à substituição e/ou abertura do locker.',
-  '4. Em caso de permanência além do horário contratado, o cliente concorda com a cobrança adicional de R$5,00 (cinco reais) por hora excedente.',
-  '5. A Locker Rio não se responsabiliza por objetos de alto valor deixados no interior do locker, como dinheiro em espécie, jóias, documentos ou equipamentos eletrônicos.',
-  '6. O horário de funcionamento é das 09h às 18h, com tolerância de 30 minutos; após este período, a unidade será encerrada e a retirada dos volumes só poderá ser realizada no dia seguinte, mediante pagamento de multa.'
-];
+      '1. A Locker Rio se compromete a disponibilizar o(s) locker(s) acima identificado(s) para guarda de volumes durante o período contratado.',
+      '2. O cliente declara que recebeu a(s) chave(s) do(s) locker(s) e está ciente de que somente com a chave é possível realizar a abertura.',
+      '3. A perda ou extravio da chave poderá gerar cobrança de taxa adicional, referente à substituição e/ou abertura do locker.',
+      '4. Em caso de permanência além do horário contratado, o cliente concorda com a cobrança adicional de R$5,00 (cinco reais) por hora excedente.',
+      '5. A Locker Rio não se responsabiliza por objetos de alto valor deixados no interior do locker, como dinheiro em espécie, jóias, documentos ou equipamentos eletrônicos.',
+      '6. O horário de funcionamento é das 09h às 18h, com tolerância de 30 minutos; após este período, a unidade será encerrada e a retirada dos volumes só poderá ser realizada no dia seguinte, mediante pagamento de multa.'
+    ];
 
     termos.forEach(termo => {
       doc.text(termo);
