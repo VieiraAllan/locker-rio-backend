@@ -2,6 +2,7 @@ import express from 'express';
 import {
   criarLocacao,
   finalizarLocacao,
+  atualizarDadosClienteLocacao,
   listarAvulsasAtivas,
   listarLocacoesAtivas,
   listarHistoricoLocacoes
@@ -28,6 +29,11 @@ router.get('/avulsas-ativas', listarAvulsasAtivas);
    CRIAR LOCAÇÃO
 ========================= */
 router.post('/', criarLocacao);
+
+/* =========================
+   ATUALIZAR DADOS DO CLIENTE
+========================= */
+router.put('/:id/cliente', atualizarDadosClienteLocacao);
 
 /* =========================
    FINALIZAR LOCAÇÃO

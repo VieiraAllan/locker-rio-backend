@@ -101,34 +101,34 @@ export async function criarLocacao(req, res) {
       : false;
 
     if (!cliente_nome || !cliente_documento) {
-    return res.status(400).json({
-      success: false,
-      error: 'Nome e documento do cliente são obrigatórios'
-    });
-  }
+      return res.status(400).json({
+        success: false,
+        error: 'Nome e documento do cliente são obrigatórios'
+      });
+    }
 
-  if (configuracoes.exigirTelefoneCliente && !cliente_telefone) {
-    return res.status(400).json({
-      success: false,
-      error: 'Telefone do cliente é obrigatório'
-    });
-  }
+    if (configuracoes.exigirTelefoneCliente && !cliente_telefone) {
+      return res.status(400).json({
+        success: false,
+        error: 'Telefone do cliente é obrigatório'
+      });
+    }
 
-  if (configuracoes.exigirLacres && !String(lacres).trim()) {
-  return res.status(400).json({
-    success: false,
-    error: 'Numeração dos lacres é obrigatória'
-  });
-}
+    if (configuracoes.exigirLacres && !String(lacres).trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Numeração dos lacres é obrigatória'
+      });
+    }
 
     const isAvulsa = !locker_ids || locker_ids.length === 0;
 
     if (isAvulsa && !configuracoes.permitirBagagemAvulsa) {
-    return res.status(400).json({
-      success: false,
-      error: 'Bagagem avulsa está desabilitada nas configurações'
-    });
-     }
+      return res.status(400).json({
+        success: false,
+        error: 'Bagagem avulsa está desabilitada nas configurações'
+      });
+    }
 
     if (!isAvulsa && (!locker_ids || locker_ids.length === 0)) {
       return res.status(400).json({
@@ -162,82 +162,81 @@ export async function criarLocacao(req, res) {
       }
     }
 
-/* ===== datas ===== */
-  const agora = new Date();
-  const dataLocacao = obterDataLocalISO(agora);
-  const horaEntrada = agora.toTimeString().slice(0, 8);
+    /* ===== datas ===== */
+    const agora = new Date();
+    const dataLocacao = obterDataLocalISO(agora);
+    const horaEntrada = agora.toTimeString().slice(0, 8);
 
-  const dataHoraPagoAte = new Date(
-    agora.getTime() + configuracoes.horasInclusas * 60 * 60 * 1000
-  );
+    const dataHoraPagoAte = new Date(
+      agora.getTime() + configuracoes.horasInclusas * 60 * 60 * 1000
+    );
 
-const horaPagoAte = dataHoraPagoAte.toTimeString().slice(0, 8);
+    const horaPagoAte = dataHoraPagoAte.toTimeString().slice(0, 8);
 
     /* ===== valor total devido da locação ===== */
-let valorTotal = 0;
+    let valorTotal = 0;
 
-if (!inRioTourEfetivo) {
-  if (!isAvulsa) {
-    valorTotal += configuracoes.valorLocker * locker_ids.length;
-  }
+    if (!inRioTourEfetivo) {
+      if (!isAvulsa) {
+        valorTotal += configuracoes.valorLocker * locker_ids.length;
+      }
 
-  for (const bagagem of bagagens_externas) {
-    valorTotal +=
-      configuracoes.valorBagagemAvulsa * bagagem.quantidade;
-  }
-}
+      for (const bagagem of bagagens_externas) {
+        valorTotal += configuracoes.valorBagagemAvulsa * bagagem.quantidade;
+      }
+    }
 
-/* ===== quanto o cliente realmente pagou na abertura ===== */
-const valorPagoInicial =
-  valor_pago_inicial !== null && valor_pago_inicial !== undefined
-    ? Number(valor_pago_inicial || 0)
-    : valorTotal;
+    /* ===== quanto o cliente realmente pagou na abertura ===== */
+    const valorPagoInicial =
+      valor_pago_inicial !== null && valor_pago_inicial !== undefined
+        ? Number(valor_pago_inicial || 0)
+        : valorTotal;
 
-if (!Number.isFinite(valorPagoInicial) || valorPagoInicial < 0) {
-  return res.status(400).json({
-    success: false,
-    error: 'Valor pago inicial inválido'
-  });
-}
+    if (!Number.isFinite(valorPagoInicial) || valorPagoInicial < 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valor pago inicial inválido'
+      });
+    }
 
-if (valorPagoInicial > valorTotal) {
-  return res.status(400).json({
-    success: false,
-    error: 'Valor pago inicial não pode ser maior que o valor total da locação'
-  });
-}
+    if (valorPagoInicial > valorTotal) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valor pago inicial não pode ser maior que o valor total da locação'
+      });
+    }
 
-/* ===== na abertura ainda não existe pagamento final ===== */
-const valorPagoFinal = 0;
+    /* ===== na abertura ainda não existe pagamento final ===== */
+    const valorPagoFinal = 0;
 
-const reciboNumero = `LR-${Date.now()}`;
+    const reciboNumero = `LR-${Date.now()}`;
 
     const { data: locacao, error: locacaoError } = await supabase
-  .from('locacoes')
-  .insert({
-    recibo_numero: reciboNumero,
-    data: dataLocacao,
-    hora_entrada: horaEntrada,
-    hora_pago_ate: horaPagoAte,
+      .from('locacoes')
+      .insert({
+        recibo_numero: reciboNumero,
+        data: dataLocacao,
+        hora_entrada: horaEntrada,
+        hora_pago_ate: horaPagoAte,
 
-    valor_pago_inicial: valorPagoInicial,
-    valor_pago_final: valorPagoFinal,
-    valor_total: valorTotal,
+        valor_pago_inicial: valorPagoInicial,
+        valor_pago_final: valorPagoFinal,
+        valor_total: valorTotal,
 
-    /* compatibilidade temporária com o sistema atual */
-    valor_pago: valorTotal,
+        /* compatibilidade temporária com o sistema atual */
+        valor_pago: valorTotal,
 
-    status: 'ativa',
-    cliente_nome,
-    cliente_telefone,
-    cliente_documento,
-    lacres: String(lacres || '').trim(),
-    usuario_abertura_id,
-    usuario_abertura_nome,
-    usuario_abertura_perfil
-  })
-  .select()
-  .single();
+        status: 'ativa',
+        cliente_nome,
+        cliente_telefone,
+        cliente_documento,
+        lacres: String(lacres || '').trim(),
+        usuario_abertura_id,
+        usuario_abertura_nome,
+        usuario_abertura_perfil
+      })
+      .select()
+      .single();
 
     if (locacaoError) {
       return res.status(500).json({
@@ -327,85 +326,78 @@ export async function finalizarLocacao(req, res) {
 
     const qtdLockers = (lockersRelacao || []).length;
 
-const { data: bagagens } = await supabase
-  .from('bagagens_extras')
-  .select('quantidade')
-  .eq('locacao_id', id);
+    const { data: bagagens } = await supabase
+      .from('bagagens_extras')
+      .select('quantidade')
+      .eq('locacao_id', id);
 
-const totalBagagens = (bagagens || []).reduce(
-  (t, b) => t + Number(b.quantidade || 0),
-  0
-);
+    const totalBagagens = (bagagens || []).reduce(
+      (t, b) => t + Number(b.quantidade || 0),
+      0
+    );
 
-          /* ===== configurações ===== */
-      const configuracoes = await obterConfiguracoesSistema();
+    const configuracoes = await obterConfiguracoesSistema();
 
-      /* ===== excedente ===== */
-      const horasExcedentes = calcularHorasCheiasExcedentes(
-        locacao.data,
-        locacao.hora_entrada,
-        locacao.hora_pago_ate
-      );
+    const horasExcedentes = calcularHorasCheiasExcedentes(
+      locacao.data,
+      locacao.hora_entrada,
+      locacao.hora_pago_ate
+    );
 
+    let valorExcedenteCalculado = 0;
 
-      /* ===== custo adicional / excedente devido no fechamento ===== */
-let valorExcedenteCalculado = 0;
+    if (horasExcedentes > 0) {
+      if (valor_excedente_manual !== null) {
+        valorExcedenteCalculado = Number(valor_excedente_manual || 0);
+      } else {
+        valorExcedenteCalculado =
+          horasExcedentes *
+          configuracoes.valorHoraExcedente *
+          (qtdLockers + totalBagagens);
+      }
+    }
 
-if (horasExcedentes > 0) {
-  if (valor_excedente_manual !== null) {
-    valorExcedenteCalculado = Number(valor_excedente_manual || 0);
-  } else {
-    valorExcedenteCalculado =
-      horasExcedentes *
-      configuracoes.valorHoraExcedente *
-      (qtdLockers + totalBagagens);
-  }
-}
+    const valorBaseOriginal = Number(
+      locacao.valor_total || locacao.valor_pago || 0
+    );
 
-/* ===== valor base devido da locação ===== */
-const valorBaseOriginal = Number(
-  locacao.valor_total || locacao.valor_pago || 0
-);
+    const valorTotal = valorBaseOriginal + valorExcedenteCalculado;
 
-/* ===== valor total devido da locação ===== */
-const valorTotal = valorBaseOriginal + valorExcedenteCalculado;
+    const valorPagoInicial = Number(locacao.valor_pago_inicial || 0);
 
-const valorPagoInicial = Number(locacao.valor_pago_inicial || 0);
+    const valorPagoFinal =
+      valor_pago_final !== null && valor_pago_final !== undefined
+        ? Number(valor_pago_final || 0)
+        : valorExcedenteCalculado;
 
-/* ===== quanto o cliente realmente pagou no fechamento ===== */
-const valorPagoFinal =
-  valor_pago_final !== null && valor_pago_final !== undefined
-    ? Number(valor_pago_final || 0)
-    : valorExcedenteCalculado;
+    if (!Number.isFinite(valorPagoFinal) || valorPagoFinal < 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valor pago final inválido'
+      });
+    }
 
-if (!Number.isFinite(valorPagoFinal) || valorPagoFinal < 0) {
-  return res.status(400).json({
-    success: false,
-    error: 'Valor pago final inválido'
-  });
-}
+    const valorPendenteAtual = valorTotal - valorPagoInicial;
 
-const valorPendenteAtual = valorTotal - valorPagoInicial;
-
-if (valorPagoFinal > valorPendenteAtual) {
-  return res.status(400).json({
-    success: false,
-    error: 'Valor pago final não pode ser maior que o valor pendente'
-  });
-}
+    if (valorPagoFinal > valorPendenteAtual) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valor pago final não pode ser maior que o valor pendente'
+      });
+    }
 
     await supabase
-  .from('locacoes')
-  .update({
-    valor_pago_final: valorPagoFinal,
-    valor_total: valorTotal,
+      .from('locacoes')
+      .update({
+        valor_pago_final: valorPagoFinal,
+        valor_total: valorTotal,
 
-    /* compatibilidade temporária com o sistema atual */
-    valor_pago: valorTotal,
+        /* compatibilidade temporária com o sistema atual */
+        valor_pago: valorTotal,
 
-    status: 'finalizada'
-  })
-  .eq('id', id);
+        status: 'finalizada'
+      })
+      .eq('id', id);
 
     if (qtdLockers > 0) {
       const lockerIds = lockersRelacao.map(l => l.locker_id);
@@ -428,6 +420,96 @@ if (valorPagoFinal > valorPendenteAtual) {
     return res.status(500).json({
       success: false,
       error: 'Erro ao finalizar locação'
+    });
+  }
+}
+
+/* =========================
+   ATUALIZAR DADOS DO CLIENTE
+========================= */
+export async function atualizarDadosClienteLocacao(req, res) {
+  try {
+    const { id } = req.params;
+    const {
+      cliente_nome,
+      cliente_telefone = '',
+      cliente_documento
+    } = req.body;
+
+    const configuracoes = await obterConfiguracoesSistema();
+
+    const nomeNormalizado = String(cliente_nome || '').trim();
+    const telefoneNormalizado = String(cliente_telefone || '').trim();
+    const documentoNormalizado = String(cliente_documento || '').trim();
+
+    if (!nomeNormalizado) {
+      return res.status(400).json({
+        success: false,
+        error: 'Nome do cliente é obrigatório'
+      });
+    }
+
+    if (!documentoNormalizado) {
+      return res.status(400).json({
+        success: false,
+        error: 'Documento / observação é obrigatório'
+      });
+    }
+
+    if (configuracoes.exigirTelefoneCliente && !telefoneNormalizado) {
+      return res.status(400).json({
+        success: false,
+        error: 'Telefone do cliente é obrigatório'
+      });
+    }
+
+    const { data: locacaoExistente, error: locacaoError } = await supabase
+      .from('locacoes')
+      .select('id, status')
+      .eq('id', id)
+      .single();
+
+    if (locacaoError || !locacaoExistente || locacaoExistente.status !== 'ativa') {
+      return res.status(404).json({
+        success: false,
+        error: 'Locação ativa não encontrada'
+      });
+    }
+
+    const { data: locacaoAtualizada, error: updateError } = await supabase
+      .from('locacoes')
+      .update({
+        cliente_nome: nomeNormalizado,
+        cliente_telefone: telefoneNormalizado,
+        cliente_documento: documentoNormalizado
+      })
+      .eq('id', id)
+      .select(`
+        id,
+        cliente_nome,
+        cliente_telefone,
+        cliente_documento,
+        status
+      `)
+      .single();
+
+    if (updateError) {
+      return res.status(500).json({
+        success: false,
+        error: updateError.message
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: locacaoAtualizada
+    });
+  } catch (err) {
+    console.error('ERRO ATUALIZAR DADOS DO CLIENTE:', err);
+
+    return res.status(500).json({
+      success: false,
+      error: 'Erro ao atualizar dados do cliente'
     });
   }
 }
@@ -515,9 +597,6 @@ export async function listarAvulsasAtivas(req, res) {
 ========================= */
 export async function listarLocacoesAtivas(req, res) {
   try {
-    /* =========================
-       1. BUSCAR LOCAÇÕES ATIVAS
-    ========================= */
     const { data: locacoes, error: locacoesError } = await supabase
       .from('locacoes')
       .select(`
@@ -526,7 +605,7 @@ export async function listarLocacoesAtivas(req, res) {
         data,
         hora_entrada,
         hora_pago_ate,
-        valor_pago,        
+        valor_pago,
         valor_pago_inicial,
         valor_pago_final,
         valor_total,
@@ -559,9 +638,6 @@ export async function listarLocacoesAtivas(req, res) {
 
     const locacaoIds = locacoes.map(locacao => locacao.id);
 
-    /* =========================
-       2. BUSCAR TODAS AS RELAÇÕES COM LOCKERS EM LOTE
-    ========================= */
     const { data: relacoesLockers, error: relacoesError } = await supabase
       .from('locacao_lockers')
       .select('locacao_id, locker_id')
@@ -584,9 +660,6 @@ export async function listarLocacoesAtivas(req, res) {
       )
     ];
 
-    /* =========================
-       3. BUSCAR TODOS OS LOCKERS RELACIONADOS EM LOTE
-    ========================= */
     let lockers = [];
 
     if (lockerIdsUnicos.length > 0) {
@@ -606,9 +679,6 @@ export async function listarLocacoesAtivas(req, res) {
       lockers = lockersData || [];
     }
 
-    /* =========================
-       4. BUSCAR TODAS AS BAGAGENS EXTRAS EM LOTE
-    ========================= */
     const { data: bagagensData, error: bagagensError } = await supabase
       .from('bagagens_extras')
       .select('locacao_id, descricao, quantidade')
@@ -623,9 +693,6 @@ export async function listarLocacoesAtivas(req, res) {
 
     const bagagensExtras = bagagensData || [];
 
-    /* =========================
-       5. MONTAR MAPAS EM MEMÓRIA
-    ========================= */
     const numeroLockerPorId = new Map();
 
     lockers.forEach(locker => {
@@ -661,9 +728,6 @@ export async function listarLocacoesAtivas(req, res) {
       });
     });
 
-    /* =========================
-       6. MONTAR RESPOSTA FINAL
-    ========================= */
     const resultado = locacoes.map(locacao => {
       const lockersNumeros = lockersPorLocacao.get(locacao.id) || [];
       const bagagens = bagagensPorLocacao.get(locacao.id) || [];
@@ -734,9 +798,6 @@ export async function listarLocacoesAtivas(req, res) {
 ========================= */
 export async function listarHistoricoLocacoes(req, res) {
   try {
-    /* =========================
-       1. BUSCAR LOCAÇÕES FINALIZADAS
-    ========================= */
     const { data: locacoes, error: locacoesError } = await supabase
       .from('locacoes')
       .select(`
@@ -758,7 +819,6 @@ export async function listarHistoricoLocacoes(req, res) {
         usuario_abertura_nome,
         usuario_abertura_perfil
       `)
-
       .eq('status', 'finalizada')
       .order('data', { ascending: false })
       .order('hora_entrada', { ascending: false });
@@ -779,9 +839,6 @@ export async function listarHistoricoLocacoes(req, res) {
 
     const locacaoIds = locacoes.map(locacao => locacao.id);
 
-    /* =========================
-       2. BUSCAR TODAS AS RELAÇÕES COM LOCKERS EM LOTE
-    ========================= */
     const { data: relacoesLockers, error: relacoesError } = await supabase
       .from('locacao_lockers')
       .select('locacao_id, locker_id')
@@ -804,9 +861,6 @@ export async function listarHistoricoLocacoes(req, res) {
       )
     ];
 
-    /* =========================
-       3. BUSCAR TODOS OS LOCKERS RELACIONADOS EM LOTE
-    ========================= */
     let lockers = [];
 
     if (lockerIdsUnicos.length > 0) {
@@ -826,9 +880,6 @@ export async function listarHistoricoLocacoes(req, res) {
       lockers = lockersData || [];
     }
 
-    /* =========================
-       4. BUSCAR TODAS AS BAGAGENS EXTRAS EM LOTE
-    ========================= */
     const { data: bagagensData, error: bagagensError } = await supabase
       .from('bagagens_extras')
       .select('locacao_id, descricao, quantidade')
@@ -842,10 +893,6 @@ export async function listarHistoricoLocacoes(req, res) {
     }
 
     const bagagensExtras = bagagensData || [];
-
-    /* =========================
-       5. MONTAR MAPAS EM MEMÓRIA
-    ========================= */
 
     const numeroLockerPorId = new Map();
 
@@ -882,9 +929,6 @@ export async function listarHistoricoLocacoes(req, res) {
       });
     });
 
-    /* =========================
-       6. MONTAR RESPOSTA FINAL
-    ========================= */
     const resultado = locacoes.map(locacao => {
       const lockersNumeros = lockersPorLocacao.get(locacao.id) || [];
       const bagagens = bagagensPorLocacao.get(locacao.id) || [];
