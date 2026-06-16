@@ -12,12 +12,31 @@ import usuariosRoutes from './routes/usuarios.routes.js';
 import authRoutes from './routes/auth.routes.js';
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
+
+const allowedOrigins = [
+  'http://localhost:5173',
+  process.env.FRONTEND_URL
+].filter(Boolean);
 
 /* =========================
    MIDDLEWARES
 ========================= */
-app.use(cors());
+app.use(cors({
+  origin(origin, callback) {
+    // permite requisições sem origin (Postman, curl, servidor-servidor)
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error('Origem não permitida pelo CORS'));
+  }
+}));
+
 app.use(express.json());
 
 /* =========================
@@ -43,5 +62,5 @@ app.use('/auth', authRoutes);
    START DO SERVIDOR
 ========================= */
 app.listen(PORT, () => {
-  console.log(`Servidor rodando em http://localhost:${PORT}`);
+  console.log(`Servidor rodando na porta ${PORT}`);
 });
