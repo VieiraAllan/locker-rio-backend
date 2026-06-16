@@ -17,41 +17,35 @@ const PORT = process.env.PORT || 3000;
 const allowedOrigins = [
   'http://localhost:5173',
   process.env.FRONTEND_URL
-].filter(Boolean);
+]
+  .filter(Boolean)
+  .map(url => url.replace(/\/$/, ''));
 
 const corsOptions = {
   origin(origin, callback) {
-    // permite chamadas sem Origin (Postman, curl, servidor-servidor)
     if (!origin) {
       return callback(null, true);
     }
 
-    if (allowedOrigins.includes(origin)) {
+    const normalizedOrigin = origin.replace(/\/$/, '');
+
+    if (allowedOrigins.includes(normalizedOrigin)) {
       return callback(null, true);
     }
 
-    return callback(new Error('Origem não permitida pelo CORS'));
+    return callback(new Error(`Origin not permitted by CORS: ${origin}`));
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 };
 
-/* =========================
-   MIDDLEWARES
-========================= */
 app.use(cors(corsOptions));
 app.use(express.json());
 
-/* =========================
-   ROTAS BÁSICAS
-========================= */
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-/* =========================
-   ROTAS DO SISTEMA
-========================= */
 app.use('/lockers', lockersRoutes);
 app.use('/locacoes', locacoesRoutes);
 app.use('/mensagens', mensagensRoutes);
@@ -61,9 +55,6 @@ app.use('/configuracoes', configuracoesRoutes);
 app.use('/usuarios', usuariosRoutes);
 app.use('/auth', authRoutes);
 
-/* =========================
-   START DO SERVIDOR
-========================= */
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
