@@ -1,6 +1,15 @@
 import 'dotenv/config';
 import express from 'express';
-import cors from '';import cors from 'cors';
+import cors from 'cors';
+
+import lockersRoutes from './routes/lockers.routes.js';
+import locacoesRoutes from './routes/locacoes.routes.js';
+import mensagensRoutes from './routes/mensagens.routes.js';
+import reciboRoutes from './routes/recibo.routes.js';
+import relatoriosRoutes from './routes/relatorios.routes.js';
+import configuracoesRoutes from './routes/configuracoes.routes.js';
+import usuariosRoutes from './routes/usuarios.routes.js';
+import authRoutes from './routes/auth.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,7 +21,7 @@ const allowedOrigins = [
 
 const corsOptions = {
   origin(origin, callback) {
-    // permite Postman, curl e chamadas sem Origin
+    // permite chamadas sem Origin (Postman, curl, servidor-servidor)
     if (!origin) {
       return callback(null, true);
     }
@@ -27,13 +36,22 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization']
 };
 
+/* =========================
+   MIDDLEWARES
+========================= */
 app.use(cors(corsOptions));
 app.use(express.json());
 
+/* =========================
+   ROTAS BÁSICAS
+========================= */
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
+/* =========================
+   ROTAS DO SISTEMA
+========================= */
 app.use('/lockers', lockersRoutes);
 app.use('/locacoes', locacoesRoutes);
 app.use('/mensagens', mensagensRoutes);
@@ -43,14 +61,9 @@ app.use('/configuracoes', configuracoesRoutes);
 app.use('/usuarios', usuariosRoutes);
 app.use('/auth', authRoutes);
 
+/* =========================
+   START DO SERVIDOR
+========================= */
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
-
-import lockersRoutes from './routes/lockers.routes.js';
-import locacoesRoutes from './routes/locacoes.routes.js';
-import mensagensRoutes from './routes/mensagens.routes.js';
-import reciboRoutes from './routes/recibo.routes.js';
-import relatoriosRoutes from './routes/relatorios.routes.js';
-import configuracoesRoutes from './routes/configuracoes.routes.js';
-import usuariosRoutes from './routes/usuarios.routes.js';
