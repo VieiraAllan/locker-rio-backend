@@ -1,6 +1,10 @@
 import express from 'express';
 import { supabase } from '../lib/supabase.js';
-import { listarLockers } from '../controllers/lockers.controller.js';
+import {
+  listarLockers,
+  atualizarStatusLocker
+} from '../controllers/lockers.controller.js';
+import { autenticarUsuario } from '../middlewares/auth.middleware.js';
 
 const router = express.Router();
 
@@ -8,6 +12,11 @@ const router = express.Router();
    LISTAR LOCKERS
 ========================= */
 router.get('/', listarLockers);
+
+/* =========================
+   ALTERAR STATUS DO LOCKER
+========================= */
+router.put('/:id/status', autenticarUsuario, atualizarStatusLocker);
 
 /* =========================
    BUSCAR LOCAÇÃO ATIVA DE UM LOCKER
