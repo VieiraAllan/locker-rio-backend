@@ -1,11 +1,35 @@
 import { supabase } from '../lib/supabase.js';
 
-function obterDataLocalISO(date = new Date()) {
-  const ano = date.getFullYear();
-  const mes = String(date.getMonth() + 1).padStart(2, '0');
-  const dia = String(date.getDate()).padStart(2, '0');
+const TIME_ZONE = 'America/Sao_Paulo';
 
-  return `${ano}-${mes}-${dia}`;
+function obterPartesDataHoraNoFuso(date = new Date(), timeZone = TIME_ZONE) {
+  const partes = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }).formatToParts(date);
+
+  const mapa = {};
+
+  for (const parte of partes) {
+    if (parte.type !== 'literal') {
+      mapa[parte.type] = parte.value;
+    }
+  }
+
+  return {
+    dataISO: `${mapa.year}-${mapa.month}-${mapa.day}`,
+    hora: `${mapa.hour}:${mapa.minute}:${mapa.second}`
+  };
+}
+
+function obterDataLocalISO(date = new Date()) {
+  return obterPartesDataHoraNoFuso(date).dataISO;
 }
 
 /* =========================
@@ -182,14 +206,16 @@ export async function criarLocacao(req, res) {
     }
 
     const agora = new Date();
-    const dataLocacao = obterDataLocalISO(agora);
-    const horaEntrada = agora.toTimeString().slice(0, 8);
+
+    const { dataISO: dataLocacao, hora: horaEntrada } =
+      obterPartesDataHoraNoFuso(agora);
 
     const dataHoraPagoAte = new Date(
       agora.getTime() + configuracoes.horasInclusas * 60 * 60 * 1000
     );
 
-    const horaPagoAte = dataHoraPagoAte.toTimeString().slice(0, 8);
+    const { hora: horaPagoAte } =
+      obterPartesDataHoraNoFuso(dataHoraPagoAte);
 
     let valorTotal = 0;
 
