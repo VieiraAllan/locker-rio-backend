@@ -217,16 +217,38 @@ function formatarDataMensagem(data) {
 }
 
 function normalizarTelefone(telefone = '') {
-  const apenasNumeros = String(telefone || '').replace(/\D/g, '');
+  const telefoneOriginal = String(telefone || '').trim();
+  const apenasNumeros = telefoneOriginal.replace(/\D/g, '');
 
   if (!apenasNumeros) {
     return '';
   }
 
-  if (apenasNumeros.startsWith('55')) {
+  // Remove repetições indevidas do DDI 55 no começo: 5555..., 555555...
+  const semDuplicidadeBrasil = apenasNumeros.replace(/^(55){2,}/, '55');
+
+  // Se a pessoa digitou em formato internacional explícito (+ ou 00),
+  // respeita o DDI informado por ela
+  if (telefoneOriginal.startsWith('+')) {
+    return semDuplicidadeBrasil;
+  }
+
+  if (telefoneOriginal.startsWith('00')) {
+    return telefoneOriginal.replace(/\D/g, '').replace(/^00/, '');
+  }
+
+  // Se já começa com 55, mantém
+  if (semDuplicidadeBrasil.startsWith('55')) {
+    return semDuplicidadeBrasil;
+  }
+
+  // Se tem tamanho típico de número internacional já informado com DDI,
+  // não força o 55
+  if (apenasNumeros.length >= 12) {
     return apenasNumeros;
   }
 
+  // Caso contrário, assume número brasileiro sem DDI
   return `55${apenasNumeros}`;
 }
 
