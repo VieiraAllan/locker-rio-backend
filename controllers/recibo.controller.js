@@ -183,22 +183,36 @@ function desenharTituloSecao(doc, titulo, x, y, width) {
 }
 
 function desenharCampo(doc, label, valor, x, y, width, options = {}) {
+  const fontSize = options.fontSize || 8.7;
   const labelWidth = options.labelWidth || 72;
+  const gap = options.gap || 4;
+  const valorTexto = textoSeguro(valor);
+  const valorWidth = Math.max(20, width - labelWidth - gap);
 
   doc
     .font('Helvetica-Bold')
-    .fontSize(options.fontSize || 8.7)
+    .fontSize(fontSize)
     .fillColor(COR_TEXTO)
-    .text(`${label}:`, x, y, { width: labelWidth, continued: true });
+    .text(`${label}:`, x, y, {
+      width: labelWidth,
+      continued: false
+    });
+
+  const alturaValor = doc.heightOfString(valorTexto, {
+    width: valorWidth,
+    lineGap: 0
+  });
 
   doc
     .font('Helvetica')
-    .fontSize(options.fontSize || 8.7)
+    .fontSize(fontSize)
     .fillColor(COR_TEXTO)
-    .text(` ${textoSeguro(valor)}`, {
-      width: width - labelWidth,
-      continued: false
+    .text(valorTexto, x + labelWidth + gap, y, {
+      width: valorWidth,
+      lineGap: 0
     });
+
+  return Math.max(alturaValor, fontSize + 2) + 3;
 }
 
 export async function gerarReciboPDF(req, res) {
@@ -299,13 +313,10 @@ export async function gerarReciboPDF(req, res) {
 
     desenharTituloSecao(doc, 'DADOS DO CLIENTE', coluna1X, y, colunaWidth);
     y += 18;
-    desenharCampo(doc, 'Nome', locacao.cliente_nome, coluna1X, y, colunaWidth);
-    y += 12;
-    desenharCampo(doc, 'Telefone', locacao.cliente_telefone, coluna1X, y, colunaWidth);
-    y += 12;
-    desenharCampo(doc, 'Documento', locacao.cliente_documento, coluna1X, y, colunaWidth);
-    y += 12;
-    desenharCampo(
+    y += desenharCampo(doc, 'Nome', locacao.cliente_nome, coluna1X, y, colunaWidth);
+    y += desenharCampo(doc, 'Telefone', locacao.cliente_telefone, coluna1X, y, colunaWidth);
+    y += desenharCampo(doc, 'Documento', locacao.cliente_documento, coluna1X, y, colunaWidth);
+    y += desenharCampo(
       doc,
       'Cliente',
       locacao.in_rio_tour ? 'In Rio Tour' : 'Regular',
@@ -317,17 +328,12 @@ export async function gerarReciboPDF(req, res) {
     let yLocacao = topoBlocoY;
     desenharTituloSecao(doc, 'DADOS DA LOCAÇÃO', coluna2X, yLocacao, colunaWidth);
     yLocacao += 18;
-    desenharCampo(doc, 'Recibo', locacao.recibo_numero || locacao.id, coluna2X, yLocacao, colunaWidth);
-    yLocacao += 12;
-    desenharCampo(doc, 'Tipo', isAvulsa ? 'Bagagem avulsa' : 'Locker', coluna2X, yLocacao, colunaWidth);
-    yLocacao += 12;
-    desenharCampo(doc, 'Data', formatarData(locacao.data), coluna2X, yLocacao, colunaWidth);
-    yLocacao += 12;
-    desenharCampo(doc, 'Entrada', locacao.hora_entrada || '—', coluna2X, yLocacao, colunaWidth);
-    yLocacao += 12;
-    desenharCampo(doc, 'Pago até', locacao.hora_pago_ate || '—', coluna2X, yLocacao, colunaWidth);
-    yLocacao += 12;
-    desenharCampo(doc, 'Lacres', locacao.lacres || '—', coluna2X, yLocacao, colunaWidth);
+    yLocacao += desenharCampo(doc, 'Recibo', locacao.recibo_numero || locacao.id, coluna2X, yLocacao, colunaWidth);
+    yLocacao += desenharCampo(doc, 'Tipo', isAvulsa ? 'Bagagem avulsa' : 'Locker', coluna2X, yLocacao, colunaWidth);
+    yLocacao += desenharCampo(doc, 'Data', formatarData(locacao.data), coluna2X, yLocacao, colunaWidth);
+    yLocacao += desenharCampo(doc, 'Entrada', locacao.hora_entrada || '—', coluna2X, yLocacao, colunaWidth);
+    yLocacao += desenharCampo(doc, 'Pago até', locacao.hora_pago_ate || '—', coluna2X, yLocacao, colunaWidth);
+    yLocacao += desenharCampo(doc, 'Lacres', locacao.lacres || '—', coluna2X, yLocacao, colunaWidth);
 
     y = Math.max(y + 16, yLocacao + 16);
     desenharLinha(doc, y, margemEsquerda, larguraUtil);
