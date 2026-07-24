@@ -437,7 +437,7 @@ export async function finalizarLocacao(req, res) {
         });
       }
 
-      if (valorExcedenteManualNormalizado > valorExcedenteSugerido) {
+      if (!locacao.in_rio_tour && valorExcedenteManualNormalizado > valorExcedenteSugerido) {
         return res.status(400).json({
           success: false,
           error: 'A cobrança de excedente manual não pode ser maior que a cobrança calculada'
