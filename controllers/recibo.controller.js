@@ -5,20 +5,21 @@ import PDFDocument from 'pdfkit';
 import { supabase } from '../lib/supabase.js';
 
 const COR_INSTITUCIONAL = '#F2B705';
+const COR_TEXTO = '#111111';
+const COR_CINZA = '#666666';
+const COR_LINHA = '#D8D8D8';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const LOGO_PATH = path.resolve(__dirname, '../assets/logo-cliente.png');
 
 function formatarValor(valor) {
   const numero = Number(valor || 0);
-
   return `R$ ${numero.toFixed(2).replace('.', ',')}`;
 }
 
 function formatarData(data) {
-  if (!data) {
-    return '—';
-  }
+  if (!data) return '—';
 
   const partes = String(data).split('-');
 
@@ -27,7 +28,42 @@ function formatarData(data) {
   }
 
   const [ano, mes, dia] = partes;
-  return `${dia}-${mes}-${ano}`;
+  return `${dia}/${mes}/${ano}`;
+}
+
+function textoSeguro(valor, fallback = '—') {
+  const texto = String(valor ?? '').trim();
+  return texto || fallback;
+}
+
+function calcularValorPagoRecibo(locacao) {
+  const temValorPagoInicial =
+    locacao.valor_pago_inicial !== null &&
+    locacao.valor_pago_inicial !== undefined &&
+    String(locacao.valor_pago_inicial).trim() !== '';
+
+  const temValorPagoFinal =
+    locacao.valor_pago_final !== null &&
+    locacao.valor_pago_final !== undefined &&
+    String(locacao.valor_pago_final).trim() !== '';
+
+  if (temValorPagoInicial || temValorPagoFinal) {
+    return (
+      Number(locacao.valor_pago_inicial || 0) +
+      Number(locacao.valor_pago_final || 0)
+    );
+  }
+
+  const temValorPagoLegado =
+    locacao.valor_pago !== null &&
+    locacao.valor_pago !== undefined &&
+    String(locacao.valor_pago).trim() !== '';
+
+  if (temValorPagoLegado) {
+    return Number(locacao.valor_pago || 0);
+  }
+
+  return Number(locacao.valor_total || 0);
 }
 
 async function buscarConfiguracoesSistema() {
@@ -120,6 +156,51 @@ async function buscarDadosRecibo(locacaoId) {
   };
 }
 
+function desenharLinha(doc, y, margemEsquerda, larguraUtil) {
+  doc
+    .strokeColor(COR_LINHA)
+    .lineWidth(0.7)
+    .moveTo(margemEsquerda, y)
+    .lineTo(margemEsquerda + larguraUtil, y)
+    .stroke()
+    .strokeColor(COR_TEXTO);
+}
+
+function desenharTituloSecao(doc, titulo, x, y, width) {
+  doc
+    .fillColor(COR_TEXTO)
+    .font('Helvetica-Bold')
+    .fontSize(10)
+    .text(titulo, x, y, { width });
+
+  doc
+    .strokeColor(COR_INSTITUCIONAL)
+    .lineWidth(1)
+    .moveTo(x, y + 13)
+    .lineTo(x + width, y + 13)
+    .stroke()
+    .strokeColor(COR_TEXTO);
+}
+
+function desenharCampo(doc, label, valor, x, y, width, options = {}) {
+  const labelWidth = options.labelWidth || 72;
+
+  doc
+    .font('Helvetica-Bold')
+    .fontSize(options.fontSize || 8.7)
+    .fillColor(COR_TEXTO)
+    .text(`${label}:`, x, y, { width: labelWidth, continued: true });
+
+  doc
+    .font('Helvetica')
+    .fontSize(options.fontSize || 8.7)
+    .fillColor(COR_TEXTO)
+    .text(` ${textoSeguro(valor)}`, {
+      width: width - labelWidth,
+      continued: false
+    });
+}
+
 export async function gerarReciboPDF(req, res) {
   try {
     const { id } = req.params;
@@ -132,231 +213,289 @@ export async function gerarReciboPDF(req, res) {
     } = await buscarDadosRecibo(id);
 
     const isAvulsa = lockers.length === 0;
-    const doc = new PDFDocument({ margin: 40 });
+    const valorPagoRecibo = calcularValorPagoRecibo(locacao);
+    const nomeArquivo = `recibo-${locacao.recibo_numero || locacao.id}.pdf`;
+
+    const doc = new PDFDocument({
+      size: 'A4',
+      margin: 24,
+      bufferPages: false,
+      autoFirstPage: true
+    });
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader(
       'Content-Disposition',
-      `inline; filename=recibo-${locacao.recibo_numero || locacao.id}.pdf`
+      `attachment; filename="${nomeArquivo}"`
     );
 
     doc.pipe(res);
 
-    /* =========================
-       CABEÇALHO
-    ========================= */
-    const margemEsquerda = 40;
-    const larguraUtil = 550 - 40;
-    const topoY = 24;
-    const logoWidth = 110;
-    const logoHeight = 44;
+    const margemEsquerda = 28;
+    const margemDireita = 28;
+    const larguraUtil = doc.page.width - margemEsquerda - margemDireita;
+    const centroX = doc.page.width / 2;
 
+    let y = 18;
+
+    /* =========================
+       CABEÇALHO COMPACTO
+    ========================= */
     if (fs.existsSync(LOGO_PATH)) {
-      doc.image(LOGO_PATH, (doc.page.width - logoWidth) / 2, topoY, {
-        fit: [logoWidth, logoHeight],
+      doc.image(LOGO_PATH, centroX - 47, y, {
+        fit: [94, 38],
         align: 'center',
         valign: 'center'
       });
+      y += 42;
     }
-
-    const tituloY = topoY + logoHeight + 8;
 
     doc
       .fillColor(COR_INSTITUCIONAL)
-      .fontSize(22)
+      .font('Helvetica-Bold')
+      .fontSize(17)
       .text(
         (configuracoes.nomeEstabelecimento || 'LOCKER RIO').toUpperCase(),
         margemEsquerda,
-        tituloY,
-        {
-          width: larguraUtil,
-          align: 'center'
-        }
+        y,
+        { width: larguraUtil, align: 'center' }
       );
+
+    y += 20;
 
     doc
-      .fontSize(12)
-      .text(
-        'Guarda-volumes e bagagens',
-        margemEsquerda,
-        tituloY + 24,
-        {
-          width: larguraUtil,
-          align: 'center'
-        }
-      );
+      .fillColor(COR_TEXTO)
+      .font('Helvetica')
+      .fontSize(9)
+      .text('Guarda-volumes e bagagens', margemEsquerda, y, {
+        width: larguraUtil,
+        align: 'center'
+      });
 
-    const enderecoY = tituloY + 40;
+    y += 12;
 
     if (configuracoes.enderecoEstabelecimento) {
       doc
-        .fontSize(9)
-        .text(
-          configuracoes.enderecoEstabelecimento,
-          margemEsquerda,
-          enderecoY,
-          {
-            width: larguraUtil,
-            align: 'center'
-          }
-        );
+        .fillColor(COR_CINZA)
+        .fontSize(7.5)
+        .text(configuracoes.enderecoEstabelecimento, margemEsquerda, y, {
+          width: larguraUtil,
+          align: 'center'
+        });
+      y += 11;
     }
 
-    const linhaY = configuracoes.enderecoEstabelecimento
-      ? enderecoY + 18
-      : tituloY + 46;
-
-    doc
-      .strokeColor(COR_INSTITUCIONAL)
-      .lineWidth(1)
-      .moveTo(40, linhaY)
-      .lineTo(550, linhaY)
-      .stroke();
-
-    doc.y = linhaY + 16;
-    doc.fillColor('black').strokeColor('black');
+    desenharLinha(doc, y, margemEsquerda, larguraUtil);
+    y += 10;
 
     /* =========================
-       CLIENTE
+       DADOS EM DUAS COLUNAS
     ========================= */
-    doc.fontSize(14).text('DADOS DO CLIENTE', { underline: true });
-    doc.fontSize(11);
-    doc.text(`Nome: ${locacao.cliente_nome || '—'}`);
-    doc.text(`Telefone: ${locacao.cliente_telefone || '—'}`);
-    doc.text(`Documento / Observação: ${locacao.cliente_documento || '—'}`);
-    doc.text(
-      `Tipo de cliente: ${locacao.in_rio_tour ? 'In Rio Tour' : 'Cliente regular'}`
+    const colunaGap = 14;
+    const colunaWidth = (larguraUtil - colunaGap) / 2;
+    const coluna1X = margemEsquerda;
+    const coluna2X = margemEsquerda + colunaWidth + colunaGap;
+    const topoBlocoY = y;
+
+    desenharTituloSecao(doc, 'DADOS DO CLIENTE', coluna1X, y, colunaWidth);
+    y += 18;
+    desenharCampo(doc, 'Nome', locacao.cliente_nome, coluna1X, y, colunaWidth);
+    y += 12;
+    desenharCampo(doc, 'Telefone', locacao.cliente_telefone, coluna1X, y, colunaWidth);
+    y += 12;
+    desenharCampo(doc, 'Documento', locacao.cliente_documento, coluna1X, y, colunaWidth);
+    y += 12;
+    desenharCampo(
+      doc,
+      'Cliente',
+      locacao.in_rio_tour ? 'In Rio Tour' : 'Regular',
+      coluna1X,
+      y,
+      colunaWidth
     );
-    doc.moveDown(1);
+
+    let yLocacao = topoBlocoY;
+    desenharTituloSecao(doc, 'DADOS DA LOCAÇÃO', coluna2X, yLocacao, colunaWidth);
+    yLocacao += 18;
+    desenharCampo(doc, 'Recibo', locacao.recibo_numero || locacao.id, coluna2X, yLocacao, colunaWidth);
+    yLocacao += 12;
+    desenharCampo(doc, 'Tipo', isAvulsa ? 'Bagagem avulsa' : 'Locker', coluna2X, yLocacao, colunaWidth);
+    yLocacao += 12;
+    desenharCampo(doc, 'Data', formatarData(locacao.data), coluna2X, yLocacao, colunaWidth);
+    yLocacao += 12;
+    desenharCampo(doc, 'Entrada', locacao.hora_entrada || '—', coluna2X, yLocacao, colunaWidth);
+    yLocacao += 12;
+    desenharCampo(doc, 'Pago até', locacao.hora_pago_ate || '—', coluna2X, yLocacao, colunaWidth);
+    yLocacao += 12;
+    desenharCampo(doc, 'Lacres', locacao.lacres || '—', coluna2X, yLocacao, colunaWidth);
+
+    y = Math.max(y + 16, yLocacao + 16);
+    desenharLinha(doc, y, margemEsquerda, larguraUtil);
+    y += 10;
 
     /* =========================
-       LOCAÇÃO
+       ITENS DA LOCAÇÃO
     ========================= */
-    doc.fontSize(14).text('DADOS DA LOCAÇÃO', { underline: true });
-    doc.fontSize(11);
-    doc.text(`Recibo Nº: ${locacao.recibo_numero || '—'}`);
-    doc.text(`Tipo: ${isAvulsa ? 'Bagagem avulsa' : 'Locker'}`);
-    doc.text(`Data: ${formatarData(locacao.data)}`);
-    doc.text(`Entrada: ${locacao.hora_entrada || '—'}`);
-    doc.text(`Pago até: ${locacao.hora_pago_ate || '—'}`);
+    desenharTituloSecao(doc, 'ITENS DA LOCAÇÃO', margemEsquerda, y, larguraUtil);
+    y += 18;
 
-    if (locacao.lacres) {
-      doc.text(`Lacres: ${locacao.lacres}`);
-    } else {
-      doc.text('Lacres: —');
-    }
+    doc.font('Helvetica').fontSize(8.8).fillColor(COR_TEXTO);
 
-    doc.moveDown(1);
-
-    /* =========================
-       ARMÁRIOS
-    ========================= */
     if (!isAvulsa) {
-      doc.fontSize(14).text('ARMÁRIOS', { underline: true });
-      doc.fontSize(11);
+      const numerosLockers = lockers
+        .map(locker => locker.numero)
+        .filter(numero => numero !== null && numero !== undefined)
+        .join(', ');
 
-      lockers.forEach(locker => {
-        doc.text(`• Armário ${locker.numero}`);
+      doc.text(`Armário(s): ${numerosLockers || '—'}`, margemEsquerda, y, {
+        width: larguraUtil
       });
-
-      doc.moveDown(1);
+      y += 12;
     }
 
-    /* =========================
-       BAGAGENS EXTRAS
-    ========================= */
     if (bagagens.length > 0) {
-      doc.fontSize(14).text('BAGAGENS EXTRAS', { underline: true });
-      doc.fontSize(11);
+      const descricaoBagagens = bagagens
+        .map(bagagem => `${Number(bagagem.quantidade || 0)}x ${textoSeguro(bagagem.descricao, 'Bagagem')}`)
+        .join(' | ');
 
-      bagagens.forEach(bagagem => {
-        doc.text(`• ${bagagem.quantidade}x ${bagagem.descricao}`);
+      doc.text(`Bagagens extras: ${descricaoBagagens}`, margemEsquerda, y, {
+        width: larguraUtil
       });
-
-      doc.moveDown(1);
+      y += Math.max(12, doc.heightOfString(`Bagagens extras: ${descricaoBagagens}`, {
+        width: larguraUtil
+      }) + 2);
+    } else {
+      doc.text('Bagagens extras: —', margemEsquerda, y, { width: larguraUtil });
+      y += 12;
     }
 
+    y += 4;
+
     /* =========================
-       VALOR
+       VALORES
     ========================= */
-    const valorPagoInicial = Number(
-      locacao.valor_pago_inicial ?? locacao.valor_pago ?? 0
-    );
+    const boxValorY = y;
+    doc
+      .roundedRect(margemEsquerda, boxValorY, larguraUtil, 32, 4)
+      .fillAndStroke('#FFF8DF', COR_INSTITUCIONAL);
 
     doc
-      .fontSize(16)
-      .text(
-        `VALOR PAGO: ${formatarValor(valorPagoInicial)}`,
-        { align: 'right' }
-      );
+      .fillColor(COR_TEXTO)
+      .font('Helvetica-Bold')
+      .fontSize(10)
+      .text('VALOR PAGO', margemEsquerda + 12, boxValorY + 10, {
+        width: 180
+      });
 
-    doc.moveDown(2);
+    doc
+      .fillColor(COR_TEXTO)
+      .font('Helvetica-Bold')
+      .fontSize(16)
+      .text(formatarValor(valorPagoRecibo), margemEsquerda + 190, boxValorY + 7, {
+        width: larguraUtil - 202,
+        align: 'right'
+      });
+
+    y += 42;
 
     /* =========================
-       TERMOS
+       TERMOS COMPACTOS
     ========================= */
-    doc.fontSize(13).text('TERMOS E CONDIÇÕES DE USO', { underline: true });
-    doc.moveDown(0.5);
-    doc.fontSize(10);
+    desenharTituloSecao(doc, 'TERMOS E CONDIÇÕES DE USO', margemEsquerda, y, larguraUtil);
+    y += 17;
 
     const termos = [
-      '1. A Locker Rio se compromete a disponibilizar o(s) locker(s) acima identificado(s) para guarda de volumes durante o período contratado.',
-      '2. O cliente declara que recebeu a(s) chave(s) do(s) locker(s) e está ciente de que somente com a chave é possível realizar a abertura.',
-      '3. A perda ou extravio da chave poderá gerar cobrança de taxa adicional, referente à substituição e/ou abertura do locker.',
-      '4. Em caso de permanência além do horário contratado, o cliente concorda com a cobrança adicional de R$5,00 (cinco reais) por hora excedente.',
-      '5. A Locker Rio não se responsabiliza por objetos de alto valor deixados no interior do locker, como dinheiro em espécie, jóias, documentos ou equipamentos eletrônicos.',
-      '6. O horário de funcionamento é das 09h às 18h, com tolerância de 30 minutos; após este período, a unidade será encerrada e a retirada dos volumes só poderá ser realizada no dia seguinte, mediante pagamento de multa.'
+      '1. A Locker Rio disponibiliza o(s) locker(s) identificado(s) para guarda de volumes durante o período contratado.',
+      '2. O cliente declara ter recebido a(s) chave(s) e está ciente de que somente com a chave é possível abrir o locker.',
+      '3. A perda ou extravio da chave poderá gerar cobrança adicional referente à substituição e/ou abertura do locker.',
+      `4. Após o horário contratado, poderá ser cobrado adicional de ${formatarValor(configuracoes.valorHoraExcedente)} por hora excedente.`,
+      '5. A Locker Rio não se responsabiliza por objetos de alto valor deixados no interior do locker.',
+      '6. O horário de funcionamento é das 09h às 18h, com tolerância de 30 minutos; após este período, a retirada poderá ocorrer no dia seguinte, mediante multa.'
     ];
 
+    doc.font('Helvetica').fontSize(7.7).fillColor(COR_TEXTO);
+
     termos.forEach(termo => {
-      doc.text(termo);
-      doc.moveDown(0.3);
+      const altura = doc.heightOfString(termo, { width: larguraUtil, lineGap: 0 });
+      doc.text(termo, margemEsquerda, y, {
+        width: larguraUtil,
+        lineGap: 0
+      });
+      y += altura + 3;
     });
 
-    doc.moveDown(1);
+    y += 4;
 
     if (configuracoes.mensagemRecibo) {
-      doc.text(configuracoes.mensagemRecibo);
-      doc.moveDown(1);
+      doc
+        .font('Helvetica-Oblique')
+        .fontSize(8)
+        .fillColor(COR_CINZA)
+        .text(configuracoes.mensagemRecibo, margemEsquerda, y, {
+          width: larguraUtil,
+          align: 'center'
+        });
+
+      y += doc.heightOfString(configuracoes.mensagemRecibo, {
+        width: larguraUtil,
+        align: 'center'
+      }) + 6;
     }
 
-    doc.text('Ao assinar, o cliente declara estar de acordo com as condições acima.');
-    doc.moveDown(2);
+    doc
+      .font('Helvetica')
+      .fontSize(8)
+      .fillColor(COR_TEXTO)
+      .text('Ao assinar, o cliente declara estar de acordo com as condições acima.', margemEsquerda, y, {
+        width: larguraUtil,
+        align: 'center'
+      });
+
+    y += 24;
 
     /* =========================
        ASSINATURA
     ========================= */
-    doc.text('Assinatura do Cliente: _________________________________');
-    doc.moveDown(1);
+    doc
+      .font('Helvetica')
+      .fontSize(8.5)
+      .fillColor(COR_TEXTO)
+      .text('Assinatura do Cliente: _______________________________________________', margemEsquerda, y, {
+        width: larguraUtil,
+        align: 'center'
+      });
+
+    y += 18;
 
     /* =========================
-       CONTATO
+       RODAPÉ
     ========================= */
+    desenharLinha(doc, y, margemEsquerda, larguraUtil);
+    y += 8;
+
     doc
-      .fontSize(10)
+      .font('Helvetica-Bold')
+      .fontSize(8.2)
       .fillColor(COR_INSTITUCIONAL)
-      .text(
-        `WhatsApp: ${configuracoes.telefoneEstabelecimento || '+55 (21) 96921-4218'}`,
-        {
-          align: 'center',
-          link: 'https://wa.me/5521969214218',
-          underline: true
-        }
-      );
+      .text(`WhatsApp: ${configuracoes.telefoneEstabelecimento || '+55 (21) 96921-4218'}`, margemEsquerda, y, {
+        width: larguraUtil / 2,
+        align: 'left',
+        link: 'https://wa.me/5521969214218',
+        underline: true
+      });
 
-    doc.moveDown(0.2);
-
-    doc.text(
-      'Instagram: @locker.rio',
-      {
-        align: 'center',
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(8.2)
+      .fillColor(COR_INSTITUCIONAL)
+      .text('Instagram: @locker.rio', margemEsquerda + larguraUtil / 2, y, {
+        width: larguraUtil / 2,
+        align: 'right',
         link: 'https://instagram.com/locker.rio',
         underline: true
-      }
-    );
+      });
 
     doc.end();
-
   } catch (err) {
     console.error('Erro PDF:', err);
 

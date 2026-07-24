@@ -241,7 +241,11 @@ export async function criarLocacao(req, res) {
       });
     }
 
-    if (valorPagoInicial > valorTotal) {
+    if (inRioTourEfetivo) {
+      valorTotal = valorPagoInicial;
+    }
+
+    if (!inRioTourEfetivo && valorPagoInicial > valorTotal) {
       return res.status(400).json({
         success: false,
         error: 'Valor pago inicial não pode ser maior que o valor total da locação'
@@ -263,6 +267,7 @@ export async function criarLocacao(req, res) {
         valor_total: valorTotal,
         valor_pago: valorTotal,
         status: 'ativa',
+        in_rio_tour: inRioTourEfetivo,
         cliente_nome,
         cliente_telefone,
         cliente_documento,
@@ -716,6 +721,7 @@ export async function listarLocacoesAtivas(req, res) {
         valor_pago_final,
         valor_total,
         status,
+        in_rio_tour,
         cliente_nome,
         cliente_telefone,
         lacres,
@@ -867,6 +873,7 @@ export async function listarLocacoesAtivas(req, res) {
         valor_pago_final: locacao.valor_pago_final,
         valor_total: locacao.valor_total,
         status: locacao.status,
+        in_rio_tour: locacao.in_rio_tour,
         cliente_nome: locacao.cliente_nome,
         cliente_telefone: locacao.cliente_telefone,
         cliente_documento: locacao.cliente_documento,
@@ -915,6 +922,7 @@ export async function listarHistoricoLocacoes(req, res) {
         valor_pago_final,
         valor_total,
         status,
+        in_rio_tour,
         cliente_nome,
         cliente_telefone,
         cliente_documento,
@@ -1066,6 +1074,7 @@ export async function listarHistoricoLocacoes(req, res) {
         valor_pago_final: locacao.valor_pago_final,
         valor_total: locacao.valor_total,
         status: locacao.status,
+        in_rio_tour: locacao.in_rio_tour,
         cliente_nome: locacao.cliente_nome,
         cliente_telefone: locacao.cliente_telefone,
         cliente_documento: locacao.cliente_documento,
