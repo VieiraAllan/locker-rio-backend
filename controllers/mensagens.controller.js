@@ -10,7 +10,7 @@ const templatesMensagens = {
 É um prazer cuidar das suas bagagens enquanto você aproveita o Rio!
 
 📦 *Dados do locker*
-Locker(s): n° {lockers}
+Locker(s): n° {lockers}{bagagens_extras_bloco}
 Lacre: {lacre}
 
 ⏰ *Horário*
@@ -37,7 +37,7 @@ WhatsApp: +55 (21) 96921-4218`,
 It’s a pleasure to take care of your luggage while you enjoy Rio!
 
 📦 *Locker details*
-Locker(s): No. {lockers}
+Locker(s): No. {lockers}{bagagens_extras_bloco}
 Seal: {lacre}
 
 ⏰ *Schedule*
@@ -64,7 +64,7 @@ WhatsApp: +55 (21) 96921-4218`,
 ¡Es un placer cuidar de su equipaje mientras disfruta de Río!
 
 📦 *Datos del locker*
-Locker(s): n.º {lockers}
+Locker(s): n.º {lockers}{bagagens_extras_bloco}
 Precinto: {lacre}
 
 ⏰ *Horario*
@@ -216,6 +216,38 @@ function formatarDataMensagem(data) {
   return `${dia}/${mes}/${ano}`;
 }
 
+function formatarBagagensExtrasMensagem(bagagensExtras = [], idioma = 'pt') {
+  if (!Array.isArray(bagagensExtras) || bagagensExtras.length === 0) {
+    return '';
+  }
+
+  const titulos = {
+    pt: 'Bagagens extras',
+    en: 'Extra luggage/items',
+    es: 'Equipaje extra'
+  };
+
+  const descricoesPadrao = {
+    pt: 'Bagagem extra',
+    en: 'Extra item',
+    es: 'Equipaje extra'
+  };
+
+  const titulo = titulos[idioma] || titulos.pt;
+  const descricaoPadrao = descricoesPadrao[idioma] || descricoesPadrao.pt;
+
+  const itens = bagagensExtras
+    .map(bagagem => {
+      const quantidade = Number(bagagem.quantidade || 0);
+      const descricao = String(bagagem.descricao || descricaoPadrao).trim();
+
+      return `• ${quantidade}x ${descricao || descricaoPadrao}`;
+    })
+    .join('\n');
+
+  return `\n${titulo}:\n${itens}`;
+}
+
 function normalizarTelefone(telefone = '') {
   const telefoneOriginal = String(telefone || '').trim();
   const apenasNumeros = telefoneOriginal.replace(/\D/g, '');
@@ -224,11 +256,8 @@ function normalizarTelefone(telefone = '') {
     return '';
   }
 
-  // Remove repetições indevidas do DDI 55 no começo: 5555..., 555555...
   const semDuplicidadeBrasil = apenasNumeros.replace(/^(55){2,}/, '55');
 
-  // Se a pessoa digitou em formato internacional explícito (+ ou 00),
-  // respeita o DDI informado por ela
   if (telefoneOriginal.startsWith('+')) {
     return semDuplicidadeBrasil;
   }
@@ -237,18 +266,14 @@ function normalizarTelefone(telefone = '') {
     return telefoneOriginal.replace(/\D/g, '').replace(/^00/, '');
   }
 
-  // Se já começa com 55, mantém
   if (semDuplicidadeBrasil.startsWith('55')) {
     return semDuplicidadeBrasil;
   }
 
-  // Se tem tamanho típico de número internacional já informado com DDI,
-  // não força o 55
   if (apenasNumeros.length >= 12) {
     return apenasNumeros;
   }
 
-  // Caso contrário, assume número brasileiro sem DDI
   return `55${apenasNumeros}`;
 }
 
@@ -339,6 +364,15 @@ async function buscarDadosMensagem(locacaoId) {
     lockers = lockersData || [];
   }
 
+  const { data: bagagensExtras, error: bagagensExtrasError } = await supabase
+    .from('bagagens_extras')
+    .select('descricao, quantidade')
+    .eq('locacao_id', locacaoId);
+
+  if (bagagensExtrasError) {
+    throw new Error('Erro ao buscar bagagens extras da locação');
+  }
+
   const { data: configuracoes, error: configuracoesError } = await supabase
     .from('configuracoes_sistema')
     .select(`
@@ -355,13 +389,20 @@ async function buscarDadosMensagem(locacaoId) {
   return {
     locacao,
     lockers,
+    bagagensExtras: bagagensExtras || [],
     configuracoes: {
       valorHoraExcedente: Number(configuracoes?.valor_hora_excedente ?? 5)
     }
   };
 }
 
-function montarVariaveisMensagem({ locacao, lockers, configuracoes }) {
+function montarVariaveisMensagem({
+  locacao,
+  lockers,
+  bagagensExtras = [],
+  configuracoes,
+  idioma = 'pt'
+}) {
   const numerosLockers = Array.isArray(lockers) && lockers.length > 0
     ? lockers.map(locker => locker.numero).join(', ')
     : 'Bagagem avulsa';
@@ -371,6 +412,10 @@ function montarVariaveisMensagem({ locacao, lockers, configuracoes }) {
   return {
     cliente_nome: locacao.cliente_nome || '',
     lockers: numerosLockers,
+    bagagens_extras_bloco: formatarBagagensExtrasMensagem(
+      bagagensExtras,
+      idioma
+    ),
     lacre: locacao.lacres || '-',
     data: formatarDataMensagem(locacao.data),
     hora_entrada: locacao.hora_entrada || '-',
@@ -402,7 +447,12 @@ export async function gerarMensagemWhatsApp(req, res) {
       });
     }
 
-    const { locacao, lockers, configuracoes } = await buscarDadosMensagem(id);
+    const {
+      locacao,
+      lockers,
+      bagagensExtras,
+      configuracoes
+    } = await buscarDadosMensagem(id);
 
     const template = templatesMensagens[tipo][idioma];
 
@@ -416,7 +466,9 @@ export async function gerarMensagemWhatsApp(req, res) {
     const variaveis = montarVariaveisMensagem({
       locacao,
       lockers,
-      configuracoes
+      bagagensExtras,
+      configuracoes,
+      idioma
     });
 
     const mensagem = renderizarTemplate(template, variaveis);
@@ -435,7 +487,6 @@ export async function gerarMensagemWhatsApp(req, res) {
         whatsapp_link: whatsappLink
       }
     });
-
   } catch (err) {
     console.error('ERRO GERAR MENSAGEM WHATSAPP:', err);
 
