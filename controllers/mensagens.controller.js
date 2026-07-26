@@ -17,8 +17,8 @@ Lacre: {lacre}
 Entrada no locker: {data} às {hora_entrada}
 Período pago até: {hora_pago_ate}
 
-💰 *Valor pago*
-R$ {valor_pago_inicial}
+💰 *Pagamento*
+Valor pago: R$ {valor_pago_inicial}{valor_a_pagar_bloco}
 
 ⚠️ *Avisos importantes*
 • Em caso de ultrapassar o horário contratado, será acrescido o valor de *R$ {valor_hora_excedente} por hora adicional*.
@@ -44,8 +44,8 @@ Seal: {lacre}
 Locker check-in: {data} at {hora_entrada}
 Paid period until: {hora_pago_ate}
 
-💰 *Amount paid*
-R$ {valor_pago_inicial}
+💰 *Payment*
+Amount paid: R$ {valor_pago_inicial}{valor_a_pagar_bloco}
 
 ⚠️ *Important notices*
 • If the agreed time is exceeded, an additional fee of *R$ {valor_hora_excedente} per extra hour* will be charged.
@@ -71,8 +71,8 @@ Precinto: {lacre}
 Entrada al locker: {data} a las {hora_entrada}
 Período pagado hasta: {hora_pago_ate}
 
-💰 *Valor pagado*
-R$ {valor_pago_inicial}
+💰 *Pago*
+Valor pagado: R$ {valor_pago_inicial}{valor_a_pagar_bloco}
 
 ⚠️ *Avisos importantes*
 • En caso de exceder el horario contratado, se añadirá un valor de *R$ {valor_hora_excedente} por cada hora adicional*.
@@ -246,6 +246,40 @@ function formatarBagagensExtrasMensagem(bagagensExtras = [], idioma = 'pt') {
     .join('\n');
 
   return `\n${titulo}:\n${itens}`;
+}
+
+
+function calcularValorAPagar(locacao) {
+  const valorTotal = Number(locacao?.valor_total || 0);
+  const valorPagoInicial = Number(locacao?.valor_pago_inicial || 0);
+  const valorPagoFinal = Number(locacao?.valor_pago_final || 0);
+
+  return Math.max(0, valorTotal - valorPagoInicial - valorPagoFinal);
+}
+
+function formatarValorAPagarMensagem(locacao, idioma = 'pt') {
+  const valorAPagar = calcularValorAPagar(locacao);
+
+  if (valorAPagar <= 0) {
+    return '';
+  }
+
+  const labels = {
+    pt: 'A pagar',
+    en: 'Amount due',
+    es: 'Pendiente de pago'
+  };
+
+  const observacoesExcedente = {
+    pt: ' + Excedente (se houver)',
+    en: ' + Extra time fee (if any)',
+    es: ' + Excedente (si corresponde)'
+  };
+
+  const label = labels[idioma] || labels.pt;
+  const observacaoExcedente = observacoesExcedente[idioma] || observacoesExcedente.pt;
+
+  return `\n${label}: R$ ${formatarValorMensagem(valorAPagar)}${observacaoExcedente}`;
 }
 
 function normalizarTelefone(telefone = '') {
