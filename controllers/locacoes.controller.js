@@ -130,6 +130,7 @@ export async function criarLocacao(req, res) {
       cliente_nome,
       cliente_telefone,
       cliente_documento,
+      observacao = '',
       lacres = '',
       usuario_abertura_id = null,
       usuario_abertura_nome = null,
@@ -271,6 +272,7 @@ export async function criarLocacao(req, res) {
         cliente_nome,
         cliente_telefone,
         cliente_documento,
+        observacao: String(observacao || '').trim(),
         lacres: String(lacres || '').trim(),
         usuario_abertura_id,
         usuario_abertura_nome,
@@ -563,7 +565,7 @@ export async function atualizarDadosClienteLocacao(req, res) {
     if (!documentoNormalizado) {
       return res.status(400).json({
         success: false,
-        error: 'Documento / observação é obrigatório'
+        error: 'Documento é obrigatório'
       });
     }
 
@@ -726,6 +728,7 @@ export async function listarLocacoesAtivas(req, res) {
         cliente_telefone,
         lacres,
         cliente_documento,
+        observacao,
         usuario_abertura_id,
         usuario_abertura_nome,
         usuario_abertura_perfil
@@ -877,6 +880,7 @@ export async function listarLocacoesAtivas(req, res) {
         cliente_nome: locacao.cliente_nome,
         cliente_telefone: locacao.cliente_telefone,
         cliente_documento: locacao.cliente_documento,
+        observacao: locacao.observacao,
         lacres: locacao.lacres,
         tipo,
         lockers: lockersNumeros,
@@ -926,6 +930,7 @@ export async function listarHistoricoLocacoes(req, res) {
         cliente_nome,
         cliente_telefone,
         cliente_documento,
+        observacao,
         lacres,
         usuario_abertura_id,
         usuario_abertura_nome,
@@ -1078,6 +1083,7 @@ export async function listarHistoricoLocacoes(req, res) {
         cliente_nome: locacao.cliente_nome,
         cliente_telefone: locacao.cliente_telefone,
         cliente_documento: locacao.cliente_documento,
+        observacao: locacao.observacao,
         lacres: locacao.lacres,
         tipo,
         lockers: lockersNumeros,
