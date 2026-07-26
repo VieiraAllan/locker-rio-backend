@@ -455,6 +455,7 @@ function montarVariaveisMensagem({
     hora_entrada: locacao.hora_entrada || '-',
     hora_pago_ate: locacao.hora_pago_ate || '-',
     valor_pago_inicial: formatarValorMensagem(locacao.valor_pago_inicial || 0),
+    valor_a_pagar_bloco: formatarValorAPagarMensagem(locacao, idioma),
     valor_pago_final: formatarValorMensagem(locacao.valor_pago_final || 0),
     valor_total: formatarValorMensagem(locacao.valor_total || 0),
     valor_hora_excedente: formatarValorMensagem(
