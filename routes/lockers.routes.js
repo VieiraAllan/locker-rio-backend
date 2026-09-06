@@ -2,9 +2,14 @@ import express from 'express';
 import { supabase } from '../lib/supabase.js';
 import {
   listarLockers,
-  atualizarStatusLocker
+  atualizarStatusLocker,
+  criarLocker,
+  excluirLocker
 } from '../controllers/lockers.controller.js';
-import { autenticarUsuario } from '../middlewares/auth.middleware.js';
+import {
+  autenticarUsuario,
+  permitirPerfis
+} from '../middlewares/auth.middleware.js';
 
 const router = express.Router();
 
@@ -14,9 +19,31 @@ const router = express.Router();
 router.get('/', listarLockers);
 
 /* =========================
+   CRIAR LOCKER
+   (Somente Gerente e Admin)
+========================= */
+router.post(
+  '/',
+  autenticarUsuario,
+  permitirPerfis('admin', 'gerente'),
+  criarLocker
+);
+
+/* =========================
    ALTERAR STATUS DO LOCKER
 ========================= */
 router.put('/:id/status', autenticarUsuario, atualizarStatusLocker);
+
+/* =========================
+   EXCLUIR LOCKER
+   (Somente Gerente e Admin)
+========================= */
+router.delete(
+  '/:id',
+  autenticarUsuario,
+  permitirPerfis('admin', 'gerente'),
+  excluirLocker
+);
 
 /* =========================
    BUSCAR LOCAÇÃO ATIVA DE UM LOCKER
