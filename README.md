@@ -43,7 +43,6 @@ A API permite:
 ## 📂 Estrutura principal
 
 ```txt
->>>>>>> ea7830ea58b2ef1d237c890ccd8ff89e3e61d6c6
 locker-rio-backend/
 ├── controllers/
 │   ├── auth.controller.js
