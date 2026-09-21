@@ -132,11 +132,19 @@ export async function criarLocacao(req, res) {
       cliente_documento,
       observacao = '',
       lacres = '',
-      usuario_abertura_id = null,
-      usuario_abertura_nome = null,
-      usuario_abertura_perfil = null,
       valor_pago_inicial = null,
     } = req.body;
+
+    if (!req.usuario) {
+      return res.status(401).json({
+        success: false,
+        error: 'Usuário não autenticado'
+      });
+    }
+
+    const usuario_abertura_id = req.usuario.id;
+    const usuario_abertura_nome = req.usuario.nome;
+    const usuario_abertura_perfil = req.usuario.perfil;
 
     const configuracoes = await obterConfiguracoesSistema();
 

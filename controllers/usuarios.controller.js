@@ -47,18 +47,8 @@ async function buscarUsuarioPorId(id) {
   return data || null;
 }
 
-async function obterUsuarioAtual(req) {
-  if (req.usuario) {
-    return req.usuario;
-  }
-
-  const usuarioId = req.headers['x-usuario-id'];
-
-  if (!usuarioId) {
-    return null;
-  }
-
-  return await buscarUsuarioPorId(usuarioId);
+function obterUsuarioAtual(req) {
+  return req.usuario || null;
 }
 
 function podeGerenciarPerfil(usuarioAtual, perfilAlvo) {
