@@ -23,7 +23,8 @@ A API permite:
 - gerar mensagens para WhatsApp;
 - gerar recibos em PDF;
 - gerenciar usuários reais com perfis;
-- preparar autenticação por email e senha.
+- autenticar por email e senha, emitindo JWT com validade padrão de 12 horas;
+- aceitar múltiplos lockers (`locker_ids`) em uma única locação, para o mesmo cliente.
 
 ---
 
@@ -53,9 +54,13 @@ locker-rio-backend/
 │   ├── relatorios.controller.js
 │   └── usuarios.controller.js
 │
+├── middlewares/
+│   └── auth.middleware.js
+│
 ├── lib/
 │   ├── senhas.js
-│   └── supabase.js
+│   ├── supabase.js
+│   └── tokens.js
 │
 ├── routes/
 │   ├── auth.routes.js
@@ -73,6 +78,12 @@ locker-rio-backend/
 ├── .gitignore
 └── README.md
 ```
+
+---
+
+## 🤖 Diretrizes para agentes de IA
+
+Consulte [`AGENTS.md`](./AGENTS.md) antes de propor ou aplicar alterações neste repositório.
 
 ---
 
